@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Robo por Gestos — MQTT</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+<style>
+  :root{
+    --bg: #0d1117;
+    --panel: #131a24;
+    --line: #223047;
+    --text: #dbe4f0;
+    --muted: #7d8ba3;
+    --accent: #35d0ba;
+    --accent-dim: #1c6e63;
+    --warn: #ff6b5e;
+    --mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+    --sans: "Inter", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--sans); padding:24px; min-height:100vh;
+  }
+  h1{
+    font-size:15px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted); font-weight:600; margin:0 0 20px 0;
+  }
+  h1 span{ color:var(--accent); }
+  .layout{
+    display:grid; grid-template-columns: minmax(320px, 560px) 300px;
+    gap:20px; max-width:920px; margin:0 auto;
+  }
+  @media (max-width: 760px){ .layout{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:16px;
+  }
+  .video-wrap{ position:relative; border-radius:8px; overflow:hidden; background:#000; }
+  video, canvas{ position:absolute; top:0; left:0; width:100%; height:100%; }
+  video{ transform:scaleX(-1); object-fit:cover; }
+  canvas{ transform:scaleX(-1); }
+  .video-wrap::before{ content:""; display:block; padding-top:75%; }
+
+  .gesture-tag{
+    position:absolute; top:10px; left:10px; z-index:2;
+    background:rgba(13,17,23,.75); border:1px solid var(--accent-dim);
+    color:var(--accent); font-family:var(--mono); font-size:13px;
+    padding:5px 10px; border-radius:6px;
+  }
+
+  button{
+    margin-top:14px; width:100%; padding:10px; border-radius:6px; border:none;
+    background:var(--accent); color:#03211d; font-weight:700; letter-spacing:.03em;
+    cursor:pointer; font-size:13px; text-transform:uppercase;
+  }
+  button.stop{ background:var(--warn); color:#2a0906; }
+
+  .status-row{ display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:12px; margin-top:10px; }
+  .dot{ width:8px; height:8px; border-radius:50%; background:var(--muted); }
+  .dot.on{ background:var(--accent); box-shadow:0 0 8px var(--accent); }
+  .dot.off{ background:var(--warn); }
+
+  .motor{ margin-top:16px; }
+  .motor-label{ display:flex; justify-content:space-between; font-family:var(--mono); font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .motor-track{ height:10px; background:#0a0f16; border:1px solid var(--line); border-radius:5px; position:relative; overflow:hidden; }
+  .motor-fill{ position:absolute; top:0; bottom:0; left:50%; width:0%; background:var(--accent); transition:width .08s linear, left .08s linear; }
+  .motor-fill.neg{ background:var(--warn); }
+
+  .cmd-line{
+    font-family:var(--mono); font-size:12px; color:var(--muted);
+    margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);
+    word-break:break-all;
+  }
+  .legend{ font-size:12px; color:var(--muted); line-height:1.8; margin-top:6px; }
+  .legend b{ color:var(--text); }
+</style>
+</head>
+<body>
+
+<h1>Controle de Robo por Gestos <span>// MQTT</span></h1>
+
+<div class="layout">
+
+  <!-- Camera + overlay -->
+  <div class="panel">
+    <div class="video-wrap">
+      <video id="webcam" autoplay playsinline></video>
+      <canvas id="overlay"></canvas>
+      <div class="gesture-tag" id="gestureTag">aguardando camera…</div>
+    </div>
+    <div class="legend">
+      🖐 mao aberta = parar &nbsp;•&nbsp;
+      ✊ punho fechado = re &nbsp;•&nbsp;
+      ☝ apontando reto pra cima = frente &nbsp;•&nbsp;
+      👈 apontando totalmente pra esquerda (dedo deitado) = gira no lugar pra esquerda &nbsp;•&nbsp;
+      👉 apontando totalmente pra direita = gira no lugar pra direita &nbsp;•&nbsp;
+      👍 joinha = turbo
+    </div>
+  </div>
+
+  <!-- Status + motores -->
+  <div class="panel">
+    <div class="status-row"><span class="dot off" id="mqttDot"></span><span id="mqttStatus">mqtt: --</span></div>
+
+    <div class="motor">
+      <div class="motor-label"><span>Motor Esquerdo</span><span id="valEsq">0</span></div>
+      <div class="motor-track"><div class="motor-fill" id="fillEsq"></div></div>
+    </div>
+    <div class="motor">
+      <div class="motor-label"><span>Motor Direito</span><span id="valDir">0</span></div>
+      <div class="motor-track"><div class="motor-fill" id="fillDir"></div></div>
+    </div>
+
+    <button class="stop" id="stopBtn">Parar tudo (S)</button>
+
+    <div class="cmd-line" id="cmdLine">— nenhum comando enviado ainda —</div>
+  </div>
+
+</div>
+
+<!-- MediaPipe Tasks Vision -->
+<script type="module">
+import {
+  GestureRecognizer,
+  FilesetResolver,
+  DrawingUtils
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+// ------------------------------------------------------------------
+// CONFIG - ajuste aqui uma vez soh; a pagina nao pede mais isso na tela
+// ------------------------------------------------------------------
+const MQTT_HOST = "broker.hivemq.com";
+const MQTT_PORT = 8884; // porta WebSocket segura (wss) - necessaria em paginas HTTPS
+const MQTT_TOPIC = "gestos/robo/comando/motores"; // padrao origem/destino/tipo/acao
+
+const VELOCIDADE_MAX = 255;      // PWM maximo enviado ao ESP32
+const ANGULO_FRENTE_MAX = 25;    // ate esse angulo (perto de "reto pra cima") = considera FRENTE
+const ANGULO_LATERAL_MIN = 65;   // a partir desse angulo (perto de 90°, dedo quase deitado) = considera VIRAR
+const COOLDOWN_MS = 120;         // intervalo minimo entre publicacoes MQTT
+
+const video = document.getElementById("webcam");
+const canvas = document.getElementById("overlay");
+const ctx = canvas.getContext("2d");
+const gestureTag = document.getElementById("gestureTag");
+
+const fillEsq = document.getElementById("fillEsq");
+const fillDir = document.getElementById("fillDir");
+const valEsq = document.getElementById("valEsq");
+const valDir = document.getElementById("valDir");
+const cmdLine = document.getElementById("cmdLine");
+const mqttDot = document.getElementById("mqttDot");
+const mqttStatus = document.getElementById("mqttStatus");
+
+let gestureRecognizer;
+let lastVideoTime = -1;
+let ultimoEnvio = 0;
+let ultimoPayload = "";
+
+// ╔═════════════════════════════════════════════════════════════╗
+// ║  TRANSPORTE MQTT (Paho, mesmo padrao do cozinha.html)        ║
+// ╚═════════════════════════════════════════════════════════════╝
+let client = null;
+
+function conectar() {
+  const clientId = "gestos_" + Math.random().toString(16).slice(2);
+  client = new Paho.MQTT.Client(MQTT_HOST, MQTT_PORT, clientId);
+
+  client.onConnectionLost = (resposta) => {
+    mqttDot.className = "dot off";
+    mqttStatus.textContent = "mqtt: offline";
+    if (resposta.errorCode !== 0) {
+      console.warn("Conexao MQTT perdida:", resposta.errorMessage);
+    }
+  };
+
+  mqttDot.className = "dot off";
+  mqttStatus.textContent = "mqtt: conectando";
+
+  client.connect({
+    useSSL: true, // obrigatorio: pagina roda em HTTPS (GitHub Pages), entao a conexao MQTT precisa ser wss://
+    onSuccess: () => {
+      mqttDot.className = "dot on";
+      mqttStatus.textContent = "mqtt: online";
+    },
+    onFailure: (err) => {
+      mqttDot.className = "dot off";
+      mqttStatus.textContent = "mqtt: falha - " + err.errorMessage;
+      setTimeout(conectar, 2000);
+    },
+  });
+}
+
+document.getElementById("stopBtn").addEventListener("click", () => publicarMotores(0, 0, "S"));
+
+function publicarMotores(motorEsq, motorDir, direcao) {
+  const payload = JSON.stringify({
+    dir: direcao,
+    motor_esq: Math.round(motorEsq),
+    motor_dir: Math.round(motorDir)
+  });
+
+  atualizarBarras(motorEsq, motorDir);
+  cmdLine.textContent = payload;
+
+  const agora = performance.now();
+  if (payload === ultimoPayload && (agora - ultimoEnvio) < 800) return; // evita flood quando parado
+  if ((agora - ultimoEnvio) < COOLDOWN_MS) return;
+
+  if (client && client.isConnected()) {
+    const mensagem = new Paho.MQTT.Message(payload);
+    mensagem.destinationName = MQTT_TOPIC;
+    client.send(mensagem);
+  }
+  ultimoEnvio = agora;
+  ultimoPayload = payload;
+}
+
+function atualizarBarras(esq, dir) {
+  valEsq.textContent = Math.round(esq);
+  valDir.textContent = Math.round(dir);
+
+  [[esq, fillEsq], [dir, fillDir]].forEach(([v, el]) => {
+    const pct = Math.min(Math.abs(v) / VELOCIDADE_MAX, 1) * 50; // metade da barra = 100%
+    el.classList.toggle("neg", v < 0);
+    if (v >= 0) {
+      el.style.left = "50%";
+      el.style.width = pct + "%";
+    } else {
+      el.style.left = (50 - pct) + "%";
+      el.style.width = pct + "%";
+    }
+  });
+}
+
+// ------------------------------------------------------------------
+// Distancia euclidiana simples entre dois landmarks (espaco normalizado 0..1)
+// ------------------------------------------------------------------
+function distancia(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// ------------------------------------------------------------------
+// Detecta quais dedos estao esticados, por geometria pura — funciona
+// com o dedo apontando pra qualquer direcao (cima, lado, diagonal),
+// diferente da classificacao pronta do MediaPipe que so reconhece
+// "Pointing_Up" quando o dedo aponta pra cima.
+// Retorna [polegar, indicador, medio, anelar, minimo] com 1 ou 0.
+// ------------------------------------------------------------------
+function dedosLevantados(landmarks) {
+  const pulso = landmarks[0];
+  const tamanhoPalma = distancia(pulso, landmarks[9]); // escala de referencia da mao
+
+  // Polegar: esticado se a ponta esta bem afastada da base do indicador
+  const polegar = distancia(landmarks[4], landmarks[5]) > tamanhoPalma * 0.65 ? 1 : 0;
+
+  // Os outros 4 dedos: esticado se a ponta esta bem mais longe do pulso
+  // do que a articulacao do meio (PIP) — isso funciona pra qualquer
+  // direcao que o dedo esteja apontando, nao so pra cima.
+  const definicoes = [
+    { ponta: 8, pip: 6 },   // indicador
+    { ponta: 12, pip: 10 }, // medio
+    { ponta: 16, pip: 14 }, // anelar
+    { ponta: 20, pip: 18 }, // minimo
+  ];
+
+  const outros = definicoes.map(({ ponta, pip }) => {
+    const distPonta = distancia(landmarks[ponta], pulso);
+    const distPip = distancia(landmarks[pip], pulso);
+    return distPonta > distPip * 1.15 ? 1 : 0; // margem de folga
+  });
+
+  return [polegar, ...outros];
+}
+
+// ------------------------------------------------------------------
+// Angulo do dedo indicador (base=landmark 5, ponta=landmark 8),
+// relativo a "reto pra cima" (0 graus). Positivo = direita, negativo = esquerda.
+// ------------------------------------------------------------------
+function anguloDoApontar(landmarks) {
+  const base = landmarks[5];
+  const ponta = landmarks[8];
+
+  // Camera entrega coordenadas cruas (nao espelhadas); a tela mostra
+  // espelhada (CSS). Invertendo o eixo X aqui, "direita" no calculo
+  // bate com "direita" que o usuario ve na tela.
+  const dx = -(ponta.x - base.x);
+  const dy = ponta.y - base.y;
+
+  const anguloRad = Math.atan2(dx, -dy); // 0 = reto pra cima
+  return anguloRad * (180 / Math.PI);
+}
+
+// ------------------------------------------------------------------
+// Traduz os dedos levantados (+ angulo, quando for so o indicador) em
+// velocidades dos 2 motores
+// ------------------------------------------------------------------
+function gestoParaMotores(dedos, landmarks) {
+  const [polegar, indicador, medio, anelar, minimo] = dedos;
+  const total = polegar + indicador + medio + anelar + minimo;
+
+  if (total === 5) {
+    return { esq: 0, dir: 0, direcao: "S", nome: "🖐 Mao aberta → PARAR" };
+  }
+
+  if (total === 0) {
+    return { esq: -VELOCIDADE_MAX, dir: -VELOCIDADE_MAX, direcao: "B", nome: "✊ Punho fechado → RE" };
+  }
+
+  if (polegar && !indicador && !medio && !anelar && !minimo) {
+    return { esq: VELOCIDADE_MAX, dir: VELOCIDADE_MAX, direcao: "A", nome: "👍 Joinha → TURBO" };
+  }
+
+  if (indicador && !polegar && !medio && !anelar && !minimo) {
+    const angulo = anguloDoApontar(landmarks);
+    const abs = Math.abs(angulo);
+    const anguloTxt = `${angulo.toFixed(0)}°`;
+
+    if (abs <= ANGULO_FRENTE_MAX) {
+      return { esq: VELOCIDADE_MAX * 0.8, dir: VELOCIDADE_MAX * 0.8, direcao: "F", nome: `☝ Frente (${anguloTxt})` };
+    }
+    if (abs >= ANGULO_LATERAL_MIN) {
+      if (angulo < 0) {
+        return { esq: -VELOCIDADE_MAX, dir: VELOCIDADE_MAX, direcao: "L", nome: `👈 Gira esquerda (${anguloTxt})` };
+      }
+      return { esq: VELOCIDADE_MAX, dir: -VELOCIDADE_MAX, direcao: "R", nome: `👉 Gira direita (${anguloTxt})` };
+    }
+    return { esq: 0, dir: 0, direcao: "S", nome: `☝ Aponte reto ↑ ou de lado ← → (${anguloTxt})` };
+  }
+
+  return { esq: 0, dir: 0, direcao: "S", nome: "Gesto nao mapeado" };
+}
+
+// ------------------------------------------------------------------
+// Inicializa MediaPipe Gesture Recognizer
+// ------------------------------------------------------------------
+async function iniciarReconhecedor() {
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+  );
+  gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath:
+        "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
+      delegate: "GPU"
+    },
+    runningMode: "VIDEO",
+    numHands: 1
+  });
+}
+
+async function iniciarCamera() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter((d) => d.kind === "videoinput");
+    if (cameras.length === 0) {
+      gestureTag.textContent = "ERRO: nenhuma camera encontrada pelo navegador";
+      throw new Error("Nenhum videoinput encontrado");
+    }
+  } catch (e) {
+    console.warn("Nao foi possivel listar dispositivos:", e);
+  }
+
+  try {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 } }
+      });
+    } catch (primeiroErro) {
+      console.warn("Falhou com constraints especificas, tentando video:true simples...", primeiroErro);
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    }
+    video.srcObject = stream;
+    await new Promise((resolve) => (video.onloadedmetadata = resolve));
+    video.play();
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+  } catch (err) {
+    console.error("Erro ao acessar a camera:", err);
+    gestureTag.textContent = `ERRO (${err.name}): ${err.message}`;
+    gestureTag.style.color = "#ff6b5e";
+    gestureTag.style.borderColor = "#ff6b5e";
+    throw err;
+  }
+}
+
+function loop() {
+  if (video.currentTime !== lastVideoTime) {
+    lastVideoTime = video.currentTime;
+    const nowMs = performance.now();
+    const resultado = gestureRecognizer.recognizeForVideo(video, nowMs);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (resultado.landmarks.length > 0) {
+      const landmarks = resultado.landmarks[0];
+
+      const drawer = new DrawingUtils(ctx);
+      drawer.drawLandmarks(landmarks, { color: "#35d0ba", radius: 3 });
+      drawer.drawConnectors(landmarks, GestureRecognizer.HAND_CONNECTIONS, { color: "#1c6e63", lineWidth: 2 });
+
+      const dedos = dedosLevantados(landmarks);
+      const { esq, dir, direcao, nome } = gestoParaMotores(dedos, landmarks);
+      gestureTag.textContent = nome;
+      publicarMotores(esq, dir, direcao);
+    } else {
+      gestureTag.textContent = "nenhuma mao detectada";
+      publicarMotores(0, 0, "S");
+    }
+  }
+  requestAnimationFrame(loop);
+}
+
+(async () => {
+  try {
+    conectar();
+    gestureTag.textContent = "carregando modelo de gestos...";
+    await iniciarReconhecedor();
+    gestureTag.textContent = "pedindo acesso a camera...";
+    await iniciarCamera();
+    loop();
+  } catch (e) {
+    console.error("Falha na inicializacao:", e);
+    if (!gestureTag.textContent.startsWith("ERRO")) {
+      gestureTag.textContent = "ERRO: " + e.message;
+    }
+  }
+})();
+</script>
+
+</body>
+</html>
