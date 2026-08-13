@@ -389,11 +389,12 @@ velocidadeSlider.addEventListener("input", () => {
 });
 
 let intervaloDpad = null;
+let controleManualAtivo = false; // true enquanto D-pad ou teclado estao sendo usados
 
 // Funcao unica que os dois controles (D-pad touch e teclado) chamam,
 // pra nao duplicar a logica de escala/turbo/publicacao.
+// Agora vale nas duas abas (Gestos e Setas).
 function enviarDirecao(nx, ny) {
-  if (abaAtiva !== "setas") return;
   const escala = (turboAtivo ? 1 : velocidadeNormalPct) * VELOCIDADE_MAX;
   const { esq, dir, direcao } = motoresPorVetor(nx, ny, escala);
   publicarMotores(esq, dir, direcao, true);
@@ -415,6 +416,7 @@ document.querySelectorAll(".dpad-btn").forEach((btn) => {
   function pressionar(ev) {
     ev.preventDefault();
     pointerAtivoId = ev.pointerId;
+    controleManualAtivo = true;
     btn.classList.add("pressionado");
     enviar();
     clearInterval(intervaloDpad);
@@ -425,6 +427,7 @@ document.querySelectorAll(".dpad-btn").forEach((btn) => {
     // so solta se for o mesmo toque que apertou (evita solturas fantasmas)
     if (ev && ev.pointerId !== pointerAtivoId) return;
     pointerAtivoId = null;
+    controleManualAtivo = false;
     btn.classList.remove("pressionado");
     clearInterval(intervaloDpad);
     intervaloDpad = null;
@@ -446,6 +449,7 @@ document.getElementById("dpadCenterStop") && document.getElementById("dpadCenter
 // ---------------- Teclado (setas ou WASD) ----------------
 // Guarda quais teclas de direcao estao pressionadas ao mesmo tempo,
 // pra permitir diagonais (ex: cima + direita = nordeste).
+// Funciona nas duas abas (Gestos e Setas).
 const teclasAtivas = new Set();
 let intervaloTeclado = null;
 
@@ -476,11 +480,10 @@ function enviarTeclado() {
 }
 
 window.addEventListener("keydown", (ev) => {
-  if (abaAtiva !== "setas") return;
-
   if (ev.key === " ") { // Espaço = parar tudo
     ev.preventDefault();
     teclasAtivas.clear();
+    controleManualAtivo = false;
     publicarMotores(0, 0, "S", true);
     return;
   }
@@ -490,6 +493,7 @@ window.addEventListener("keydown", (ev) => {
 
   if (!teclasAtivas.has(ev.key)) {
     teclasAtivas.add(ev.key);
+    controleManualAtivo = true;
     enviarTeclado();
     clearInterval(intervaloTeclado);
     intervaloTeclado = setInterval(enviarTeclado, REPETICAO_DPAD_MS);
@@ -501,6 +505,7 @@ window.addEventListener("keyup", (ev) => {
   teclasAtivas.delete(ev.key);
 
   if (teclasAtivas.size === 0) {
+    controleManualAtivo = false;
     clearInterval(intervaloTeclado);
     intervaloTeclado = null;
     publicarMotores(0, 0, "S", true);
@@ -514,6 +519,7 @@ window.addEventListener("keyup", (ev) => {
 window.addEventListener("blur", () => {
   if (teclasAtivas.size > 0) {
     teclasAtivas.clear();
+    controleManualAtivo = false;
     clearInterval(intervaloTeclado);
     intervaloTeclado = null;
     publicarMotores(0, 0, "S", true);
@@ -671,10 +677,12 @@ function loopGestos() {
       const dedos = dedosLevantados(landmarks);
       const { esq, dir, direcao, nome } = gestoParaMotores(dedos, landmarks);
       gestureTag.textContent = nome;
-      if (abaAtiva === "gestos") publicarMotores(esq, dir, direcao);
+      // gestos valem nas duas abas, mas cedem a vez se D-pad/teclado
+      // estiverem sendo usados nesse instante (evita os dois brigando)
+      if (!controleManualAtivo) publicarMotores(esq, dir, direcao);
     } else {
       gestureTag.textContent = "nenhuma mao detectada";
-      if (abaAtiva === "gestos") publicarMotores(0, 0, "S");
+      if (!controleManualAtivo) publicarMotores(0, 0, "S");
     }
   }
   requestAnimationFrame(loopGestos);
