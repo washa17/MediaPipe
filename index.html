@@ -615,20 +615,20 @@ function gestoParaMotores(dedos, landmarks) {
     const abs = Math.abs(angulo);
     const anguloTxt = `${angulo.toFixed(0)}°`;
 
-    // Zona morta pequena perto de 90/-90 (mao meio de lado sem intencao clara)
-    // e abaixo de ANGULO_FRENTE_MAX/2 fica reto, sem misturar giro.
-    if (abs < 8) {
+    // Ate ANGULO_FRENTE_MAX graus conta como "reto", sem misturar nada de
+    // curva — evita que o tremor natural da mao andando reto vire curva.
+    if (abs < ANGULO_FRENTE_MAX) {
       return { esq: VELOCIDADE_MAX * 0.8 * escala, dir: VELOCIDADE_MAX * 0.8 * escala, direcao: "F", nome: `☝ Frente (${anguloTxt})` };
     }
     if (abs > 172) {
       return { esq: 0, dir: 0, direcao: "S", nome: `☝ Angulo instavel (${anguloTxt})` };
     }
 
-    // Mixagem continua: 0° = reto, 90° = giro maximo no lugar.
-    // A curva de suavizacao (potencia 1.5) faz o inicio do movimento
-    // ser mais gradual, evitando o salto brusco de "reto" pra "giro".
+    // Mixagem continua a partir do fim da zona de reto: ANGULO_FRENTE_MAX°
+    // = comeco da curva (bem suave), 90° = giro maximo no lugar.
     const anguloClamp = Math.max(-90, Math.min(90, angulo));
-    const intensidadeCurva = Math.pow(Math.abs(anguloClamp) / 90, 1.5);
+    const progresso = (Math.abs(anguloClamp) - ANGULO_FRENTE_MAX) / (90 - ANGULO_FRENTE_MAX);
+    const intensidadeCurva = Math.pow(progresso, 1.5);
     const sentido = anguloClamp < 0 ? -1 : 1;
 
     const velBase = VELOCIDADE_MAX * 0.8;
