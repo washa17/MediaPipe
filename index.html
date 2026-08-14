@@ -386,6 +386,7 @@ const velocidadeVal = document.getElementById("velocidadeVal");
 velocidadeSlider.addEventListener("input", () => {
   velocidadeNormalPct = Number(velocidadeSlider.value) / 100;
   velocidadeVal.textContent = velocidadeSlider.value + "%";
+  console.log("[DEBUG] slider mudou -> velocidadeNormalPct =", velocidadeNormalPct);
 });
 
 let intervaloDpad = null;
@@ -396,6 +397,7 @@ let controleManualAtivo = false; // true enquanto D-pad ou teclado estao sendo u
 // Agora vale nas duas abas (Gestos e Setas).
 function enviarDirecao(nx, ny) {
   const escala = (turboAtivo ? 1 : velocidadeNormalPct) * VELOCIDADE_MAX;
+  console.log("[DEBUG] enviarDirecao -> turboAtivo:", turboAtivo, "| velocidadeNormalPct:", velocidadeNormalPct, "| escala:", escala);
   const { esq, dir, direcao } = motoresPorVetor(nx, ny, escala);
   publicarMotores(esq, dir, direcao, true);
 }
@@ -586,16 +588,35 @@ function gestoParaMotores(dedos, landmarks) {
     const abs = Math.abs(angulo);
     const anguloTxt = `${angulo.toFixed(0)}°`;
 
-    if (abs <= ANGULO_FRENTE_MAX) {
+    // Zona morta pequena perto de 90/-90 (mao meio de lado sem intencao clara)
+    // e abaixo de ANGULO_FRENTE_MAX/2 fica reto, sem misturar giro.
+    if (abs < 8) {
       return { esq: VELOCIDADE_MAX * 0.8, dir: VELOCIDADE_MAX * 0.8, direcao: "F", nome: `☝ Frente (${anguloTxt})` };
     }
-    if (abs >= ANGULO_LATERAL_MIN) {
-      if (angulo < 0) {
-        return { esq: -VELOCIDADE_MAX, dir: VELOCIDADE_MAX, direcao: "L", nome: `👈 Gira esquerda (${anguloTxt})` };
-      }
-      return { esq: VELOCIDADE_MAX, dir: -VELOCIDADE_MAX, direcao: "R", nome: `👉 Gira direita (${anguloTxt})` };
+    if (abs > 172) {
+      return { esq: 0, dir: 0, direcao: "S", nome: `☝ Angulo instavel (${anguloTxt})` };
     }
-    return { esq: 0, dir: 0, direcao: "S", nome: `☝ Aponte reto ↑ ou de lado ← → (${anguloTxt})` };
+
+    // Mixagem continua: 0° = reto, 90° = giro maximo no lugar.
+    // A curva de suavizacao (potencia 1.5) faz o inicio do movimento
+    // ser mais gradual, evitando o salto brusco de "reto" pra "giro".
+    const anguloClamp = Math.max(-90, Math.min(90, angulo));
+    const intensidadeCurva = Math.pow(Math.abs(anguloClamp) / 90, 1.5);
+    const sentido = anguloClamp < 0 ? -1 : 1;
+
+    const velBase = VELOCIDADE_MAX * 0.8;
+    const curva = sentido * intensidadeCurva * VELOCIDADE_MAX;
+    const frenteComponente = velBase * (1 - intensidadeCurva);
+
+    let esq = frenteComponente + curva;
+    let dir = frenteComponente - curva;
+
+    const maior = Math.max(Math.abs(esq), Math.abs(dir), VELOCIDADE_MAX);
+    esq = (esq / maior) * VELOCIDADE_MAX;
+    dir = (dir / maior) * VELOCIDADE_MAX;
+
+    const direcao = intensidadeCurva < 0.15 ? "F" : (sentido < 0 ? "L" : "R");
+    return { esq, dir, direcao, nome: `☝ Curva suave (${anguloTxt})` };
   }
 
   return { esq: 0, dir: 0, direcao: "S", nome: "Gesto nao mapeado" };
