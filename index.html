@@ -185,21 +185,21 @@
         </div>
       </div>
 
-      <div class="speed-row">
-        <div class="motor-label"><span>Velocidade</span><span id="velocidadeVal">60%</span></div>
-        <input type="range" id="velocidadeSlider" min="10" max="100" value="60" step="5">
-      </div>
-
-      <button class="acao turbo" id="turboBtn">Turbo: desligado</button>
-
       <div class="legend">⌨️ setas do teclado (ou WASD) tambem controlam &nbsp;•&nbsp; Espaço = parar</div>
     </div>
 
   </div>
 
-  <!-- Coluna direita: status + motores (compartilhado entre as abas) -->
+  <!-- Coluna direita: status + motores + velocidade (compartilhado entre as abas) -->
   <div class="panel">
     <div class="status-row"><span class="dot off" id="mqttDot"></span><span id="mqttStatus">mqtt: --</span></div>
+
+    <div class="speed-row">
+      <div class="motor-label"><span>Velocidade</span><span id="velocidadeVal">60%</span></div>
+      <input type="range" id="velocidadeSlider" min="10" max="100" value="60" step="5">
+    </div>
+
+    <button class="acao turbo" id="turboBtn">Turbo: desligado</button>
 
     <div class="motor">
       <div class="motor-label"><span>Motor Esquerdo</span><span id="valEsq">0</span></div>
@@ -677,12 +677,10 @@ function loopGestos() {
       const dedos = dedosLevantados(landmarks);
       const { esq, dir, direcao, nome } = gestoParaMotores(dedos, landmarks);
       gestureTag.textContent = nome;
-      // gestos valem nas duas abas, mas cedem a vez se D-pad/teclado
-      // estiverem sendo usados nesse instante (evita os dois brigando)
-      if (!controleManualAtivo) publicarMotores(esq, dir, direcao);
+      if (abaAtiva === "gestos") publicarMotores(esq, dir, direcao);
     } else {
       gestureTag.textContent = "nenhuma mao detectada";
-      if (!controleManualAtivo) publicarMotores(0, 0, "S");
+      if (abaAtiva === "gestos") publicarMotores(0, 0, "S");
     }
   }
   requestAnimationFrame(loopGestos);
