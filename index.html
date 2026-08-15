@@ -306,18 +306,24 @@ const layoutEl = document.querySelector(".layout");
 // Reflete o ultimo modo publicado em robo/display/comando/modo.
 // "aguardando" bloqueia o controle manual; os demais liberam.
 let modoRobo = "dormindo";
+let mesaAtual = null;
 
-function atualizarPainelPedido(modo) {
+function atualizarPainelPedido(modo, mesa) {
   modoRobo = modo;
+  if (mesa !== undefined && mesa !== null) mesaAtual = mesa;
+  if (modo === "dormindo") mesaAtual = null; // limpa ao voltar pra base
+
   pedidoBox.className = "pedido-box " + modo;
   layoutEl.classList.toggle("bloqueado", modo === "aguardando");
   baseBtn.style.display = (modo === "retornando") ? "block" : "none";
 
+  const rotuloMesa = mesaAtual ? `Mesa ${mesaAtual}` : "";
+
   if (modo === "navegando") {
-    pedidoLabel.textContent = "Em rota para a mesa";
+    pedidoLabel.textContent = rotuloMesa ? `Levar para ${rotuloMesa}` : "Em rota para a mesa";
     pedidoSub.textContent = "Controle liberado — dirija até a mesa indicada";
   } else if (modo === "aguardando") {
-    pedidoLabel.textContent = "Aguardando confirmação";
+    pedidoLabel.textContent = rotuloMesa ? `${rotuloMesa} — aguardando confirmação` : "Aguardando confirmação";
     pedidoSub.textContent = "Cor da mesa detectada — controle bloqueado";
   } else if (modo === "retornando") {
     pedidoLabel.textContent = "Pedido concluído";
@@ -371,7 +377,7 @@ function conectar() {
     if (mensagem.destinationName !== TOPICO_DISPLAY_MODO) return;
     try {
       const dados = JSON.parse(mensagem.payloadString);
-      if (dados.modo) atualizarPainelPedido(dados.modo);
+      if (dados.modo) atualizarPainelPedido(dados.modo, dados.mesa);
     } catch (e) {
       console.warn("Payload invalido em robo/display/comando/modo:", mensagem.payloadString);
     }
