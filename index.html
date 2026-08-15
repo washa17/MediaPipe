@@ -124,6 +124,10 @@
     margin-top:8px;
   }
   button.acao.reconectar:active{ background:var(--accent-dim); color:#fff; }
+  button.acao.base{
+    background:#ffb347; color:#2a1a06; margin-top:10px;
+  }
+  button.acao.base:active{ background:#ff7a1a; }
 
   .status-row{ display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:12px; margin-top:2px; }
   .dot{ width:8px; height:8px; border-radius:50%; background:var(--muted); }
@@ -235,6 +239,7 @@
     <div class="pedido-box" id="pedidoBox">
       <div class="pedido-label" id="pedidoLabel">Nenhum pedido ativo</div>
       <div class="pedido-sub" id="pedidoSub">Aguardando despacho da cozinha</div>
+      <button class="acao base" id="baseBtn" style="display:none;">Robô na base</button>
     </div>
 
     <div class="speed-row">
@@ -295,6 +300,7 @@ const turboBtn = document.getElementById("turboBtn");
 const pedidoBox = document.getElementById("pedidoBox");
 const pedidoLabel = document.getElementById("pedidoLabel");
 const pedidoSub = document.getElementById("pedidoSub");
+const baseBtn = document.getElementById("baseBtn");
 const layoutEl = document.querySelector(".layout");
 
 // Reflete o ultimo modo publicado em robo/display/comando/modo.
@@ -305,6 +311,7 @@ function atualizarPainelPedido(modo) {
   modoRobo = modo;
   pedidoBox.className = "pedido-box " + modo;
   layoutEl.classList.toggle("bloqueado", modo === "aguardando");
+  baseBtn.style.display = (modo === "retornando") ? "block" : "none";
 
   if (modo === "navegando") {
     pedidoLabel.textContent = "Em rota para a mesa";
@@ -406,6 +413,12 @@ function reconectarMqtt() {
 
 document.getElementById("stopBtn").addEventListener("click", () => publicarMotores(0, 0, "S", true));
 document.getElementById("reconectarBtn").addEventListener("click", reconectarMqtt);
+
+document.getElementById("baseBtn").addEventListener("click", () => {
+  publicarMotores(0, 0, "S", true); // para o robo por seguranca
+  client.publish("gestos/robo/comando/base", JSON.stringify({ status: "chegou" }));
+  baseBtn.style.display = "none";
+});
 
 function publicarMotores(motorEsq, motorDir, direcao, forcar = false) {
   // Trava de seguranca: enquanto o robo estiver em "aguardando" (cor da
