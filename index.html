@@ -163,6 +163,8 @@
   .pedido-box.aguardando .pedido-label{ color:var(--warn); }
   .pedido-box.retornando{ border-color:#ffb347; }
   .pedido-box.retornando .pedido-label{ color:#ffb347; }
+  .pedido-box.obstaculo{ border-color:var(--warn); }
+  .pedido-box.obstaculo .pedido-label{ color:var(--warn); }
   .pedido-box.concluido{ border-color:var(--accent); }
   .pedido-box.concluido .pedido-label{ color:var(--accent); }
 
@@ -276,9 +278,8 @@ import {
 // ------------------------------------------------------------------
 // CONFIG - fixo no codigo, sem campos na tela
 // ------------------------------------------------------------------
-const MQTT_HOST = "broker.hivemq.com"; // mesmo broker do ESP32 (HiveMQ publico)
-const MQTT_PORT = 8884; // WebSocket seguro (wss) do HiveMQ — a 1883 e' a porta MQTT "crua" (TCP) que so' o ESP32 usa. Alternativa sem TLS: 8000 + MQTT_USE_SSL=false
-const MQTT_USE_SSL = true;
+const MQTT_HOST = "broker.hivemq.com";
+const MQTT_PORT = 8884; // wss (necessario em pagina HTTPS, ex: GitHub Pages)
 const MQTT_TOPIC = "gestos/robo/comando/motores";
 const TOPICO_DISPLAY_MODO = "robo/display/comando/modo";
 
@@ -307,28 +308,39 @@ const layoutEl = document.querySelector(".layout");
 // Reflete o ultimo modo publicado em robo/display/comando/modo.
 // "aguardando" bloqueia o controle manual; os demais liberam.
 let modoRobo = "dormindo";
+let modoBase = "dormindo"; // ultimo modo que NAO foi obstaculo (pra saber onde estava)
 let mesaAtual = null;
+let corAtual = null;
 
-function atualizarPainelPedido(modo, mesa) {
+function atualizarPainelPedido(modo, mesa, cor) {
   modoRobo = modo;
+  if (modo !== "obstaculo") modoBase = modo;
   if (mesa !== undefined && mesa !== null) mesaAtual = mesa;
-  if (modo === "dormindo") mesaAtual = null; // limpa ao voltar pra base
+  if (cor !== undefined && cor !== null) corAtual = cor;
+  if (modo === "dormindo") { mesaAtual = null; corAtual = null; } // limpa ao voltar pra base
 
   pedidoBox.className = "pedido-box " + modo;
   layoutEl.classList.toggle("bloqueado", modo === "aguardando");
-  baseBtn.style.display = (modo === "retornando") ? "block" : "none";
+  // o botao "Robo na base" continua visivel se o obstaculo apareceu durante o retorno
+  baseBtn.style.display = (modoBase === "retornando" && modo !== "dormindo") ? "block" : "none";
 
   const rotuloMesa = mesaAtual ? `Mesa ${mesaAtual}` : "";
+  const rotuloCor = corAtual ? ` (${corAtual})` : "";
 
   if (modo === "navegando") {
-    pedidoLabel.textContent = rotuloMesa ? `Levar para ${rotuloMesa}` : "Em rota para a mesa";
+    pedidoLabel.textContent = rotuloMesa ? `Levar para ${rotuloMesa}${rotuloCor}` : "Em rota para a mesa";
     pedidoSub.textContent = "Controle liberado — dirija até a mesa indicada";
   } else if (modo === "aguardando") {
-    pedidoLabel.textContent = rotuloMesa ? `${rotuloMesa} — aguardando confirmação` : "Aguardando confirmação";
+    pedidoLabel.textContent = rotuloMesa ? `${rotuloMesa}${rotuloCor} — aguardando confirmação` : "Aguardando confirmação";
     pedidoSub.textContent = "Cor da mesa detectada — controle bloqueado";
   } else if (modo === "retornando") {
     pedidoLabel.textContent = "Pedido concluído";
     pedidoSub.textContent = "Controle liberado — retorne à base";
+  } else if (modo === "obstaculo") {
+    pedidoLabel.textContent = "Obstáculo no caminho";
+    pedidoSub.textContent = rotuloMesa
+      ? `${rotuloMesa}${rotuloCor} — avanço bloqueado, desvie ou aguarde liberar`
+      : "Avanço bloqueado — desvie ou aguarde liberar";
   } else {
     pedidoLabel.textContent = "Nenhum pedido ativo";
     pedidoSub.textContent = "Aguardando despacho da cozinha";
@@ -378,7 +390,7 @@ function conectar() {
     if (mensagem.destinationName !== TOPICO_DISPLAY_MODO) return;
     try {
       const dados = JSON.parse(mensagem.payloadString);
-      if (dados.modo) atualizarPainelPedido(dados.modo, dados.mesa);
+      if (dados.modo) atualizarPainelPedido(dados.modo, dados.mesa, dados.cor);
     } catch (e) {
       console.warn("Payload invalido em robo/display/comando/modo:", mensagem.payloadString);
     }
@@ -388,7 +400,7 @@ function conectar() {
   mqttStatus.textContent = "mqtt: conectando";
 
   client.connect({
-    useSSL: MQTT_USE_SSL, // true = wss:// (HiveMQ porta 8884)
+    useSSL: true,
     onSuccess: () => {
       mqttDot.className = "dot on";
       mqttStatus.textContent = "mqtt: online";
