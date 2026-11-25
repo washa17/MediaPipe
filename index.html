@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Controle de Robo — MQTT</title>
 <script src="js/paho-mqtt.js"></script>
-<script src="js/config-broker.js"></script>
 <style>
   :root{
     --bg: #0d1117;
@@ -280,7 +279,12 @@ import {
 
 const MQTT_TOPIC = "gestos/robo/comando/motores";
 const TOPICO_DISPLAY_MODO = "robo/display/comando/modo";
-const TOPICO_BROKER = window.SERVEBOT_TOPICOS.SISTEMA_CONFIG_BROKER;
+
+// Broker fixo: somente HiveMQ publico (sem troca de broker)
+const HIVEMQ = { host: "broker.hivemq.com", port: 8884, path: "/mqtt", useSSL: true, nome: "HiveMQ" };
+function gerarClientId(prefixo) {
+  return prefixo + "_" + Math.random().toString(16).slice(2, 10);
+}
 
 const VELOCIDADE_MAX = 255;
 let velocidadeNormalPct = 0.6; // ajustavel pela barra de velocidade (10%-100%)
@@ -366,21 +370,15 @@ let client = null;
 
 function conectar() {
   const clientId = gerarClientId("gestos");
-  const endpoint = brokerEndpoint();
-  client = new Paho.MQTT.Client(endpoint.host, endpoint.port, clientId);
+  client = new Paho.MQTT.Client(HIVEMQ.host, HIVEMQ.port, HIVEMQ.path, clientId);
 
   client.onConnectionLost = (resposta) => {
-    brokerMarcarOffline();
     mqttDot.className = "dot off";
     mqttStatus.textContent = "mqtt: offline";
     if (resposta.errorCode !== 0) console.warn("Conexao MQTT perdida:", resposta.errorMessage);
   };
 
   client.onMessageArrived = (mensagem) => {
-    if (mensagem.destinationName === TOPICO_BROKER) {
-      try { window.brokerAplicarTrocaRecebida(JSON.parse(mensagem.payloadString).broker, mensagem.retained); } catch (e) {}
-      return;
-    }
     if (mensagem.destinationName !== TOPICO_DISPLAY_MODO) return;
     try {
       const dados = JSON.parse(mensagem.payloadString);
@@ -394,17 +392,15 @@ function conectar() {
   mqttStatus.textContent = "mqtt: conectando";
 
   client.connect({
-    useSSL: endpoint.useSSL, timeout: 5, keepAliveInterval: 30,
+    useSSL: HIVEMQ.useSSL, timeout: 5, keepAliveInterval: 30,
     onSuccess: () => {
       mqttDot.className = "dot on";
-      brokerMarcarOnline();
-      mqttStatus.textContent = "mqtt: online · " + brokerNomeAtual();
+      mqttStatus.textContent = "mqtt: online · " + HIVEMQ.nome;
       client.subscribe(TOPICO_DISPLAY_MODO);
-      client.subscribe(TOPICO_BROKER);
     },
     onFailure: (err) => {
       mqttDot.className = "dot off";
-      mqttStatus.textContent = "mqtt: falha · " + brokerNomeAtual() + " - " + err.errorMessage;
+      mqttStatus.textContent = "mqtt: falha · " + HIVEMQ.nome + " - " + err.errorMessage;
       setTimeout(conectar, 2000);
     },
   });
@@ -428,7 +424,6 @@ function reconectarMqtt() {
 
 document.getElementById("stopBtn").addEventListener("click", () => publicarMotores(0, 0, "S", true));
 document.getElementById("reconectarBtn").addEventListener("click", reconectarMqtt);
-window.addEventListener("load", () => { /* política de broker iniciada pelo config-broker.js */ });
 
 document.getElementById("baseBtn").addEventListener("click", () => {
   publicarMotores(0, 0, "S", true); // para o robo por seguranca
