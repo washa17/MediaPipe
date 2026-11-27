@@ -276,8 +276,9 @@ import {
 // ------------------------------------------------------------------
 // CONFIG - fixo no codigo, sem campos na tela
 // ------------------------------------------------------------------
-const MQTT_HOST = "10.151.139.5";
-const MQTT_PORT = 9001; // WebSocket do Mosquitto local — a 1883 e' a porta MQTT "crua" (TCP) que so' o ESP32 usa; o navegador (Paho) precisa de WS/WSS
+const MQTT_HOST = "broker.hivemq.com"; // mesmo broker do ESP32 (HiveMQ publico)
+const MQTT_PORT = 8884; // WebSocket seguro (wss) do HiveMQ — a 1883 e' a porta MQTT "crua" (TCP) que so' o ESP32 usa. Alternativa sem TLS: 8000 + MQTT_USE_SSL=false
+const MQTT_USE_SSL = true;
 const MQTT_TOPIC = "gestos/robo/comando/motores";
 const TOPICO_DISPLAY_MODO = "robo/display/comando/modo";
 
@@ -387,7 +388,7 @@ function conectar() {
   mqttStatus.textContent = "mqtt: conectando";
 
   client.connect({
-    useSSL: false, // ws:// puro — Mosquitto local no notebook nao tem certificado TLS
+    useSSL: MQTT_USE_SSL, // true = wss:// (HiveMQ porta 8884)
     onSuccess: () => {
       mqttDot.className = "dot on";
       mqttStatus.textContent = "mqtt: online";
