@@ -7,175 +7,106 @@
 <script src="js/paho-mqtt.js"></script>
 <style>
   :root{
-    --bg: #0d1117;
-    --panel: #131a24;
-    --line: #223047;
-    --text: #dbe4f0;
-    --muted: #7d8ba3;
-    --accent: #35d0ba;
-    --accent-dim: #1c6e63;
-    --warn: #ff6b5e;
-    --mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
-    --sans: "Inter", system-ui, -apple-system, sans-serif;
+    --bg:#0d1117; --panel:#131a24; --line:#223047; --text:#dbe4f0; --muted:#7d8ba3;
+    --accent:#35d0ba; --accent-dim:#1c6e63; --warn:#ff6b5e; --amber:#ffb347;
+    --mono:"JetBrains Mono","Fira Code",ui-monospace,monospace;
+    --sans:"Inter",system-ui,-apple-system,sans-serif;
   }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body{ overscroll-behavior: none; }
-  body{
-    margin:0; background:var(--bg); color:var(--text);
-    font-family:var(--sans); padding:24px; min-height:100vh;
-  }
-  h1{
-    font-size:15px; letter-spacing:.14em; text-transform:uppercase;
-    color:var(--muted); font-weight:600; margin:0 0 16px 0;
-  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ overscroll-behavior:none; }
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:var(--sans); padding:20px; min-height:100vh; }
+  h1{ font-size:15px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); font-weight:600; margin:0 0 14px; }
   h1 span{ color:var(--accent); }
 
-  /* ---------------- Abas ---------------- */
-  .tabs{
-    display:flex; gap:8px; max-width:920px; margin:0 auto 16px;
-  }
+  .tabs{ display:flex; gap:8px; max-width:920px; margin:0 auto 14px; }
   .tab-btn{
-    flex:1; padding:10px; border-radius:8px; border:1px solid var(--line);
-    background:var(--panel); color:var(--muted); font-family:var(--sans);
-    font-weight:700; font-size:13px; letter-spacing:.03em; text-transform:uppercase;
-    cursor:pointer;
+    flex:1; padding:12px; border-radius:8px; border:1px solid var(--line); background:var(--panel);
+    color:var(--muted); font:700 13px var(--sans); letter-spacing:.03em; text-transform:uppercase; cursor:pointer;
   }
   .tab-btn.ativo{ background:var(--accent); color:#03211d; border-color:var(--accent); }
 
-  .layout{
-    display:grid; grid-template-columns: minmax(320px, 560px) 300px;
-    gap:20px; max-width:920px; margin:0 auto;
-  }
-  @media (max-width: 760px){ .layout{ grid-template-columns: 1fr; } }
+  .layout{ display:grid; grid-template-columns:minmax(320px,560px) 300px; gap:18px; max-width:920px; margin:0 auto; }
+  @media (max-width:760px){ .layout{ grid-template-columns:1fr; } }
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .aba{ display:none; } .aba.ativa{ display:block; }
 
-  .panel{
-    background:var(--panel); border:1px solid var(--line);
-    border-radius:10px; padding:16px;
-  }
-  .aba-conteudo{ display:none; }
-  .aba-conteudo.ativa{ display:block; }
-
-  /* ---------------- Camera (aba Gestos) ---------------- */
+  /* camera */
   .video-wrap{ position:relative; border-radius:8px; overflow:hidden; background:#000; }
-  video, canvas{ position:absolute; top:0; left:0; width:100%; height:100%; }
-  video{ transform:scaleX(-1); object-fit:cover; }
-  canvas{ transform:scaleX(-1); }
   .video-wrap::before{ content:""; display:block; padding-top:75%; }
-
+  video,canvas{ position:absolute; inset:0; width:100%; height:100%; transform:scaleX(-1); }
+  video{ object-fit:cover; }
   .gesture-tag{
-    position:absolute; top:10px; left:10px; z-index:2;
-    background:rgba(13,17,23,.75); border:1px solid var(--accent-dim);
-    color:var(--accent); font-family:var(--mono); font-size:13px;
-    padding:5px 10px; border-radius:6px;
+    position:absolute; top:10px; left:10px; right:10px; z-index:2; width:fit-content; max-width:calc(100% - 20px);
+    background:rgba(13,17,23,.8); border:1px solid var(--accent-dim); color:var(--accent);
+    font:13px var(--mono); padding:5px 10px; border-radius:6px;
   }
-  .legend{ font-size:12px; color:var(--muted); line-height:1.8; margin-top:6px; }
+  .gesture-tag.erro{ color:var(--warn); border-color:var(--warn); }
+  .legend{ font-size:12px; color:var(--muted); line-height:1.8; margin-top:8px; }
 
-  /* ---------------- D-pad (aba Setas) ---------------- */
-  .dpad-wrap{ display:flex; justify-content:center; padding:16px 0; }
-  .dpad{
-    display:grid;
-    grid-template-columns: repeat(3, 72px);
-    grid-template-rows: repeat(3, 72px);
-    gap:8px;
-  }
+  /* setas */
+  .dpad-wrap{ display:flex; justify-content:center; padding:12px 0; }
+  .dpad{ display:grid; grid-template-columns:repeat(3,76px); grid-template-rows:repeat(3,76px); gap:8px; }
   .dpad-btn{
-    border-radius:10px; border:1px solid var(--line);
-    background:#182234; color:var(--accent);
+    border-radius:10px; border:1px solid var(--line); background:#182234; color:var(--accent);
     font-size:26px; display:flex; align-items:center; justify-content:center;
-    cursor:pointer; user-select:none; touch-action:none;
+    cursor:pointer; user-select:none; -webkit-user-select:none; touch-action:none;
   }
-  .dpad-btn:active, .dpad-btn.pressionado{
-    background:var(--accent); color:#03211d; border-color:var(--accent);
-  }
+  .dpad-btn.pressionado{ background:var(--accent); color:#03211d; border-color:var(--accent); }
   .dpad-center{
-    border-radius:10px; background:#0a0f16; border:1px solid var(--line);
-    display:flex; align-items:center; justify-content:center;
-    font-family:var(--mono); font-size:10px; color:var(--muted); text-align:center;
+    border-radius:10px; background:#0a0f16; border:1px solid var(--line); display:flex; align-items:center;
+    justify-content:center; font:10px var(--mono); color:var(--muted); text-align:center;
   }
 
-  /* ---------------- Barra de velocidade ---------------- */
-  .speed-row{ margin-top:16px; }
-  .speed-row input[type="range"]{
-    -webkit-appearance:none; appearance:none; width:100%; height:8px;
-    border-radius:5px; background:#0a0f16; border:1px solid var(--line);
-    outline:none; cursor:pointer;
-  }
-  .speed-row input[type="range"]::-webkit-slider-thumb{
-    -webkit-appearance:none; appearance:none; width:18px; height:18px;
-    border-radius:50%; background:var(--accent); cursor:pointer;
-    border:2px solid #03211d; box-shadow:0 0 6px var(--accent);
-  }
-  .speed-row input[type="range"]::-moz-range-thumb{
-    width:18px; height:18px; border-radius:50%; background:var(--accent);
-    cursor:pointer; border:2px solid #03211d; box-shadow:0 0 6px var(--accent);
-  }
-
-  /* ---------------- Comuns ---------------- */
-  button.acao{
-    margin-top:14px; width:100%; padding:10px; border-radius:6px; border:none;
-    background:var(--accent); color:#03211d; font-weight:700; letter-spacing:.03em;
-    cursor:pointer; font-size:13px; text-transform:uppercase;
-  }
-  button.acao.stop{ background:var(--warn); color:#2a0906; }
-  button.acao.turbo{ background:#ffb347; color:#2a1a06; }
-  button.acao.turbo.ativo{ background:#ff7a1a; }
-  button.acao.reconectar{
-    background:transparent; color:var(--accent); border:1px solid var(--accent-dim);
-    margin-top:8px;
-  }
-  button.acao.reconectar:active{ background:var(--accent-dim); color:#fff; }
-  button.acao.base{
-    background:#ffb347; color:#2a1a06; margin-top:10px;
-  }
-  button.acao.base:active{ background:#ff7a1a; }
-
-  .status-row{ display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:12px; margin-top:2px; }
-  .dot{ width:8px; height:8px; border-radius:50%; background:var(--muted); }
+  /* lado direito */
+  .status-row{ display:flex; align-items:center; gap:8px; font:12px var(--mono); }
+  .dot{ width:9px; height:9px; border-radius:50%; background:var(--muted); flex:none; }
   .dot.on{ background:var(--accent); box-shadow:0 0 8px var(--accent); }
   .dot.off{ background:var(--warn); }
+  .dot.wait{ background:var(--amber); }
+  .robo-linha{ font:11px var(--mono); color:var(--muted); margin-top:6px; line-height:1.5; }
+  .robo-linha.ok{ color:var(--accent); } .robo-linha.aviso{ color:var(--amber); }
+  select{
+    width:100%; margin-top:10px; padding:10px; background:#0a0f16; color:var(--text);
+    border:1px solid var(--line); border-radius:6px; font:12px var(--mono);
+  }
+  details{ margin-top:8px; font:11px var(--mono); color:var(--muted); }
+  details div{ padding:2px 0; word-break:break-word; }
+  .tent-ok{ color:var(--accent); } .tent-erro{ color:var(--warn); }
 
-  .motor{ margin-top:16px; }
-  .motor-label{ display:flex; justify-content:space-between; font-family:var(--mono); font-size:12px; color:var(--muted); margin-bottom:4px; }
-  .motor-track{ height:10px; background:#0a0f16; border:1px solid var(--line); border-radius:5px; position:relative; overflow:hidden; }
-  .motor-fill{ position:absolute; top:0; bottom:0; left:50%; width:0%; background:var(--accent); transition:width .05s linear, left .05s linear; }
-  .motor-fill.neg{ background:var(--warn); }
+  button.acao{
+    margin-top:12px; width:100%; padding:12px; border-radius:6px; border:none; background:var(--accent);
+    color:#03211d; font:700 13px var(--sans); letter-spacing:.03em; cursor:pointer; text-transform:uppercase;
+  }
+  button.stop{ background:var(--warn); color:#2a0906; }
+  button.turbo{ background:var(--amber); color:#2a1a06; }
+  button.turbo.ativo{ background:#ff7a1a; }
+  button.reconectar{ background:transparent; color:var(--accent); border:1px solid var(--accent-dim); }
+  button.base{ background:var(--amber); color:#2a1a06; margin-top:10px; }
 
-  .cmd-line{
-    font-family:var(--mono); font-size:12px; color:var(--muted);
-    margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);
-    word-break:break-all;
-  }
+  .pedido-box{ margin-top:12px; padding:12px; border-radius:8px; background:#0a0f16; border:1px solid var(--line); }
+  .pedido-label{ font-size:15px; font-weight:700; }
+  .pedido-sub{ font-size:12px; color:var(--muted); margin-top:4px; }
+  .pedido-box.navegando{ border-color:var(--accent); } .pedido-box.navegando .pedido-label{ color:var(--accent); }
+  .pedido-box.aguardando,.pedido-box.erro{ border-color:var(--warn); } .pedido-box.aguardando .pedido-label,.pedido-box.erro .pedido-label{ color:var(--warn); }
+  .pedido-box.retornando,.pedido-box.obstaculo{ border-color:var(--amber); } .pedido-box.retornando .pedido-label,.pedido-box.obstaculo .pedido-label{ color:var(--amber); }
 
-  /* ---------------- Painel de pedido/mesa ---------------- */
-  .pedido-box{
-    margin-top:14px; padding:12px; border-radius:8px;
-    background:#0a0f16; border:1px solid var(--line);
-  }
-  .pedido-label{
-    font-size:15px; font-weight:700; color:var(--text);
-  }
-  .pedido-sub{
-    font-size:12px; color:var(--muted); margin-top:4px;
-  }
-  .pedido-box.navegando{ border-color:var(--accent); }
-  .pedido-box.navegando .pedido-label{ color:var(--accent); }
-  .pedido-box.aguardando{ border-color:var(--warn); }
-  .pedido-box.aguardando .pedido-label{ color:var(--warn); }
-  .pedido-box.retornando{ border-color:#ffb347; }
-  .pedido-box.retornando .pedido-label{ color:#ffb347; }
-  .pedido-box.concluido{ border-color:var(--accent); }
-  .pedido-box.concluido .pedido-label{ color:var(--accent); }
+  .speed-row{ margin-top:14px; }
+  .linha{ display:flex; justify-content:space-between; font:12px var(--mono); color:var(--muted); margin-bottom:4px; }
+  input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:8px; border-radius:5px; background:#0a0f16; border:1px solid var(--line); outline:none; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:22px; height:22px; border-radius:50%; background:var(--accent); border:2px solid #03211d; box-shadow:0 0 6px var(--accent); }
+  input[type=range]::-moz-range-thumb{ width:22px; height:22px; border-radius:50%; background:var(--accent); border:2px solid #03211d; }
 
-  /* ---------------- Bloqueio de controle (modo aguardando) ---------------- */
-  .layout.bloqueado .panel:first-child{
-    position:relative; pointer-events:none; opacity:.4;
-  }
+  .motor{ margin-top:14px; }
+  .track{ height:10px; background:#0a0f16; border:1px solid var(--line); border-radius:5px; position:relative; overflow:hidden; }
+  .fill{ position:absolute; top:0; bottom:0; left:50%; width:0; background:var(--accent); transition:width .05s linear,left .05s linear; }
+  .fill.neg{ background:var(--warn); }
+  .cmd-line{ font:12px var(--mono); color:var(--muted); margin-top:14px; padding-top:12px; border-top:1px dashed var(--line); word-break:break-all; }
+
+  .layout.bloqueado .panel:first-child{ position:relative; pointer-events:none; opacity:.4; }
   .layout.bloqueado .panel:first-child::after{
-    content:"CONTROLE BLOQUEADO — AGUARDANDO CONFIRMAÇÃO DA MESA";
-    position:absolute; inset:0; z-index:5; pointer-events:none;
-    display:flex; align-items:center; justify-content:center;
-    text-align:center; padding:20px; font-size:13px; font-weight:700;
-    color:var(--warn); text-transform:uppercase; letter-spacing:.04em;
+    content:"CONTROLE BLOQUEADO — AGUARDANDO CONFIRMAÇÃO DA MESA"; position:absolute; inset:0; z-index:5;
+    display:flex; align-items:center; justify-content:center; text-align:center; padding:20px;
+    font:700 13px var(--sans); color:var(--warn); text-transform:uppercase; letter-spacing:.04em;
   }
 </style>
 </head>
@@ -184,693 +115,620 @@
 <h1>Controle de Robo <span>// MQTT</span></h1>
 
 <div class="tabs">
-  <button class="tab-btn ativo" id="tabBtnGestos" onclick="mudarAba('gestos')">Gestos</button>
-  <button class="tab-btn" id="tabBtnSetas" onclick="mudarAba('setas')">Setas</button>
+  <button class="tab-btn ativo" id="tabBtnGestos">Gestos</button>
+  <button class="tab-btn" id="tabBtnSetas">Setas</button>
 </div>
 
-<div class="layout">
+<div class="layout" id="layout">
 
-  <!-- Coluna esquerda: conteudo da aba ativa -->
+  <!-- ESQUERDA: aba ativa -->
   <div class="panel">
-
-    <div id="abaGestos" class="aba-conteudo ativa">
+    <div class="aba ativa" id="abaGestos">
       <div class="video-wrap">
-        <video id="webcam" autoplay playsinline></video>
+        <video id="webcam" autoplay playsinline muted></video>
         <canvas id="overlay"></canvas>
-        <div class="gesture-tag" id="gestureTag">toque em "Gestos" pra ligar a camera</div>
+        <div class="gesture-tag" id="gestureTag">camera desligada</div>
       </div>
       <div class="legend">
-        🖐 mao aberta = parar &nbsp;•&nbsp;
-        ✊ punho fechado = re &nbsp;•&nbsp;
-        ☝ apontando reto pra cima = frente &nbsp;•&nbsp;
-        👈 apontando totalmente pra esquerda (dedo deitado) = gira no lugar pra esquerda &nbsp;•&nbsp;
-        👉 apontando totalmente pra direita = gira no lugar pra direita &nbsp;•&nbsp;
-        👍 joinha = turbo
+        🖐 mão aberta = parar &nbsp;•&nbsp; ✊ punho = ré &nbsp;•&nbsp; ☝ indicador pra cima = frente &nbsp;•&nbsp;
+        👈 / 👉 indicador deitado = gira no lugar &nbsp;•&nbsp; 👍 joinha = turbo
       </div>
     </div>
 
-    <div id="abaSetas" class="aba-conteudo">
+    <div class="aba" id="abaSetas">
       <div class="dpad-wrap">
         <div class="dpad">
           <div class="dpad-btn" data-dx="-1" data-dy="-1">↖</div>
           <div class="dpad-btn" data-dx="0"  data-dy="-1">↑</div>
           <div class="dpad-btn" data-dx="1"  data-dy="-1">↗</div>
-
           <div class="dpad-btn" data-dx="-1" data-dy="0">←</div>
           <div class="dpad-center">PARE<br>NO<br>MEIO</div>
           <div class="dpad-btn" data-dx="1"  data-dy="0">→</div>
-
           <div class="dpad-btn" data-dx="-1" data-dy="1">↙</div>
           <div class="dpad-btn" data-dx="0"  data-dy="1">↓</div>
           <div class="dpad-btn" data-dx="1"  data-dy="1">↘</div>
         </div>
       </div>
-
-      <div class="legend">⌨️ setas do teclado (ou WASD) tambem controlam &nbsp;•&nbsp; Espaço = parar</div>
+      <div class="legend">⌨️ setas do teclado (ou WASD) também controlam &nbsp;•&nbsp; Espaço = parar</div>
     </div>
-
   </div>
 
-  <!-- Coluna direita: status + motores + velocidade (compartilhado entre as abas) -->
+  <!-- DIREITA: conexão, pedido, velocidade, motores -->
   <div class="panel">
-    <div class="status-row"><span class="dot off" id="mqttDot"></span><span id="mqttStatus">mqtt: --</span></div>
+    <div class="status-row"><span class="dot wait" id="mqttDot"></span><span id="mqttStatus">mqtt: iniciando</span></div>
+    <div class="robo-linha" id="roboLinha">robô: aguardando conexão</div>
+
+    <select id="brokerSel" aria-label="Broker">
+      <option value="auto">Broker: automático</option>
+      <option value="mosquitto">Broker: só Mosquitto (rede local)</option>
+      <option value="hivemq">Broker: só HiveMQ (internet)</option>
+    </select>
+    <details id="tentDet"><summary>tentativas de conexão</summary><div id="tentLista">—</div></details>
     <button class="acao reconectar" id="reconectarBtn">Reconectar MQTT</button>
 
     <div class="pedido-box" id="pedidoBox">
       <div class="pedido-label" id="pedidoLabel">Nenhum pedido ativo</div>
       <div class="pedido-sub" id="pedidoSub">Aguardando despacho da cozinha</div>
-      <button class="acao base" id="baseBtn" style="display:none;">Robô na base</button>
+      <button class="acao base" id="baseBtn" style="display:none">Robô na base</button>
     </div>
 
     <div class="speed-row">
-      <div class="motor-label"><span>Velocidade</span><span id="velocidadeVal">60%</span></div>
+      <div class="linha"><span>Velocidade</span><span id="velocidadeVal">60%</span></div>
       <input type="range" id="velocidadeSlider" min="10" max="100" value="60" step="5">
     </div>
-
     <button class="acao turbo" id="turboBtn">Turbo: desligado</button>
 
-    <div class="motor">
-      <div class="motor-label"><span>Motor Esquerdo</span><span id="valEsq">0</span></div>
-      <div class="motor-track"><div class="motor-fill" id="fillEsq"></div></div>
-    </div>
-    <div class="motor">
-      <div class="motor-label"><span>Motor Direito</span><span id="valDir">0</span></div>
-      <div class="motor-track"><div class="motor-fill" id="fillDir"></div></div>
-    </div>
+    <div class="motor"><div class="linha"><span>Motor Esquerdo</span><span id="valEsq">0</span></div><div class="track"><div class="fill" id="fillEsq"></div></div></div>
+    <div class="motor"><div class="linha"><span>Motor Direito</span><span id="valDir">0</span></div><div class="track"><div class="fill" id="fillDir"></div></div></div>
 
     <button class="acao stop" id="stopBtn">Parar tudo (S)</button>
-
     <div class="cmd-line" id="cmdLine">— nenhum comando enviado ainda —</div>
   </div>
-
 </div>
 
-<!-- MediaPipe Tasks Vision -->
-<script type="module">
-import {
-  GestureRecognizer,
-  FilesetResolver,
-  DrawingUtils
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+<script>
+(function () {
+  'use strict';
 
-// ------------------------------------------------------------------
-// CONFIG - fixo no codigo, sem campos na tela
-// ------------------------------------------------------------------
+  // ================================================================
+  // CONFIGURACAO
+  // ================================================================
+  const TOPICO_MOTORES = 'gestos/robo/comando/motores';   // vai para o ESP32
+  const TOPICO_BASE    = 'gestos/robo/comando/base';       // "robo chegou na base"
+  const TOPICO_MODO    = 'robo/display/comando/modo';      // vem do ESP32 (estado do robo)
+  const TOPICO_ROBO_IP = 'robo/debug/info/ip';             // vem do ESP32 ao conectar
 
-const MQTT_TOPIC = "gestos/robo/comando/motores";
-const TOPICO_DISPLAY_MODO = "robo/display/comando/modo";
+  const IP_PADRAO_MOSQUITTO = '10.230.177.5';  // IP do PC com o Mosquitto (troque se mudar)
+  const PORTA_WS_MOSQUITTO  = 9001;            // porta WebSocket do Mosquitto
+  const CHAVE_BROKER = 'servebot_gestos_broker';
 
-// Broker fixo: somente HiveMQ publico (sem troca de broker)
-const HIVEMQ = { host: "broker.hivemq.com", port: 8884, path: "/mqtt", useSSL: true, nome: "HiveMQ" };
-function gerarClientId(prefixo) {
-  return prefixo + "_" + Math.random().toString(16).slice(2, 10);
-}
+  const VELOCIDADE_MAX = 255;
+  const ANGULO_FRENTE_MAX = 25;
+  const COOLDOWN_MS = 120;
+  const REPETICAO_MS = 300;       // reenvio enquanto segura (o ESP32 para o motor se ficar 1 s sem comando)
+  const AVISO_ROBO_MS = 4000;     // tempo esperando sinal do robo antes de avisar
 
-const VELOCIDADE_MAX = 255;
-let velocidadeNormalPct = 0.6; // ajustavel pela barra de velocidade (10%-100%)
-const ANGULO_FRENTE_MAX = 25;
-const ANGULO_LATERAL_MIN = 65;
-const COOLDOWN_MS = 120;
-const REPETICAO_DPAD_MS = 300; // intervalo pra reenviar comando enquanto segura o botao (< 1s de timeout do ESP32)
+  const $ = (id) => document.getElementById(id);
 
-const gestureTag = document.getElementById("gestureTag");
-const fillEsq = document.getElementById("fillEsq");
-const fillDir = document.getElementById("fillDir");
-const valEsq = document.getElementById("valEsq");
-const valDir = document.getElementById("valDir");
-const cmdLine = document.getElementById("cmdLine");
-const mqttDot = document.getElementById("mqttDot");
-const mqttStatus = document.getElementById("mqttStatus");
-const turboBtn = document.getElementById("turboBtn");
-const pedidoBox = document.getElementById("pedidoBox");
-const pedidoLabel = document.getElementById("pedidoLabel");
-const pedidoSub = document.getElementById("pedidoSub");
-const baseBtn = document.getElementById("baseBtn");
-const layoutEl = document.querySelector(".layout");
+  // ================================================================
+  // ESTADO
+  // ================================================================
+  let velocidadePct = 0.6;
+  let turbo = false;
+  let aba = 'gestos';
+  let modoRobo = 'dormindo';
+  let mesaAtual = null;
+  let ultimoEnvio = 0;
+  let ultimoPayload = '';
+  let enviados = 0;
 
-// Reflete o ultimo modo publicado em robo/display/comando/modo.
-// "aguardando" bloqueia o controle manual; os demais liberam.
-let modoRobo = "dormindo";
-let mesaAtual = null;
+  // ================================================================
+  // BROKER: lista de caminhos tentados em ordem
+  // ================================================================
+  // Mosquitto (rede local, ws://) so existe em pagina http: uma pagina https
+  // nao pode abrir ws://. O HiveMQ vai por wss (8884) e, em pagina http, tambem
+  // por ws (8000), que algumas redes deixam passar quando bloqueiam a 8884.
+  // O ESP32 so fala com Mosquitto e HiveMQ, entao so esses dois entram aqui.
+  function listaBrokers(protocolo, hostname, search, modo) {
+    const https = protocolo === 'https:';
+    let host = IP_PADRAO_MOSQUITTO, porta = PORTA_WS_MOSQUITTO;
 
-function atualizarPainelPedido(modo, mesa) {
-  modoRobo = modo;
-  if (mesa !== undefined && mesa !== null) mesaAtual = mesa;
-  if (modo === "dormindo") mesaAtual = null; // limpa ao voltar pra base
-
-  pedidoBox.className = "pedido-box " + modo;
-  layoutEl.classList.toggle("bloqueado", modo === "aguardando");
-  baseBtn.style.display = (modo === "retornando") ? "block" : "none";
-
-  const rotuloMesa = mesaAtual ? `Mesa ${mesaAtual}` : "";
-
-  if (modo === "navegando") {
-    pedidoLabel.textContent = rotuloMesa ? `Levar para ${rotuloMesa}` : "Em rota para a mesa";
-    pedidoSub.textContent = "Controle liberado — dirija até a mesa indicada";
-  } else if (modo === "aguardando") {
-    pedidoLabel.textContent = rotuloMesa ? `${rotuloMesa} — aguardando confirmação` : "Aguardando confirmação";
-    pedidoSub.textContent = "Cor da mesa detectada — controle bloqueado";
-  } else if (modo === "retornando") {
-    pedidoLabel.textContent = "Pedido concluído";
-    pedidoSub.textContent = "Controle liberado — retorne à base";
-  } else {
-    pedidoLabel.textContent = "Nenhum pedido ativo";
-    pedidoSub.textContent = "Aguardando despacho da cozinha";
-  }
-}
-
-let ultimoEnvio = 0;
-let ultimoPayload = "";
-let turboAtivo = false;
-let abaAtiva = "gestos"; // "gestos" ou "setas"
-
-// ╔═════════════════════════════════════════════════════════════╗
-// ║  ABAS                                                        ║
-// ╚═════════════════════════════════════════════════════════════╝
-window.mudarAba = function (nome) {
-  abaAtiva = nome;
-
-  document.getElementById("abaGestos").classList.toggle("ativa", nome === "gestos");
-  document.getElementById("abaSetas").classList.toggle("ativa", nome === "setas");
-  document.getElementById("tabBtnGestos").classList.toggle("ativo", nome === "gestos");
-  document.getElementById("tabBtnSetas").classList.toggle("ativo", nome === "setas");
-
-  publicarMotores(0, 0, "S", true); // seguranca: para tudo ao trocar de aba
-
-  if (nome === "gestos" && !gestosIniciados) {
-    gestosIniciados = true;
-    iniciarGestos();
-  }
-};
-
-// ╔═════════════════════════════════════════════════════════════╗
-// ║  TRANSPORTE MQTT (Paho)                                      ║
-// ╚═════════════════════════════════════════════════════════════╝
-let client = null;
-
-function conectar() {
-  const clientId = gerarClientId("gestos");
-  client = new Paho.MQTT.Client(HIVEMQ.host, HIVEMQ.port, HIVEMQ.path, clientId);
-
-  client.onConnectionLost = (resposta) => {
-    mqttDot.className = "dot off";
-    mqttStatus.textContent = "mqtt: offline";
-    if (resposta.errorCode !== 0) console.warn("Conexao MQTT perdida:", resposta.errorMessage);
-  };
-
-  client.onMessageArrived = (mensagem) => {
-    if (mensagem.destinationName !== TOPICO_DISPLAY_MODO) return;
-    try {
-      const dados = JSON.parse(mensagem.payloadString);
-      if (dados.modo) atualizarPainelPedido(dados.modo, dados.mesa);
-    } catch (e) {
-      console.warn("Payload invalido em robo/display/comando/modo:", mensagem.payloadString);
+    const q = new URLSearchParams(search).get('broker');
+    const m = q && q.match(/^([^:\/\s]+)(?::(\d+))?$/);
+    if (m && !['hivemq', 'mosquitto', 'reset'].includes(q)) {          // ?broker=IP[:porta]
+      host = m[1]; if (m[2]) porta = parseInt(m[2], 10);
+    } else if (!https && /^(localhost|\d{1,3}(\.\d{1,3}){3})$/.test(hostname)) {
+      host = hostname;                                                  // pagina aberta pelo proprio PC do broker
     }
-  };
 
-  mqttDot.className = "dot off";
-  mqttStatus.textContent = "mqtt: conectando";
+    const lista = [];
+    if (!https) lista.push({ familia: 'mosquitto', rotulo: 'mosquitto', host, porta, ssl: false });
+    lista.push({ familia: 'hivemq', rotulo: 'hivemq', host: 'broker.hivemq.com', porta: 8884, ssl: true });
+    if (!https) lista.push({ familia: 'hivemq', rotulo: 'hivemq (porta 8000)', host: 'broker.hivemq.com', porta: 8000, ssl: false });
 
-  client.connect({
-    useSSL: HIVEMQ.useSSL, timeout: 5, keepAliveInterval: 30,
-    onSuccess: () => {
-      mqttDot.className = "dot on";
-      mqttStatus.textContent = "mqtt: online · " + HIVEMQ.nome;
-      client.subscribe(TOPICO_DISPLAY_MODO);
-    },
-    onFailure: (err) => {
-      mqttDot.className = "dot off";
-      mqttStatus.textContent = "mqtt: falha · " + HIVEMQ.nome + " - " + err.errorMessage;
-      setTimeout(conectar, 2000);
-    },
-  });
-}
+    lista.forEach((b) => { b.url = (b.ssl ? 'wss://' : 'ws://') + b.host + ':' + b.porta; });
+    return (!modo || modo === 'auto') ? lista : lista.filter((b) => b.familia === modo);
+  }
+  window.listaBrokers = listaBrokers;   // so para testes
 
-// Usada pelo botao "Reconectar MQTT". Fecha a conexao atual (se existir)
-// antes de abrir uma nova, pra nao deixar clients fantasmas no broker.
-function reconectarMqtt() {
-  mqttDot.className = "dot off";
-  mqttStatus.textContent = "mqtt: reconectando...";
-
-  if (client && client.isConnected()) {
+  function modoEscolhido() {
     try {
-      client.disconnect();
+      const q = new URLSearchParams(location.search).get('broker');       // atalhos pela URL
+      if (q === 'hivemq' || q === 'mosquitto') localStorage.setItem(CHAVE_BROKER, q);
+      else if (q === 'reset') localStorage.setItem(CHAVE_BROKER, 'auto');
+      return localStorage.getItem(CHAVE_BROKER) || 'auto';
+    } catch (e) { return 'auto'; }
+  }
+
+  // ================================================================
+  // MQTT
+  // ================================================================
+  let cli = null;
+  let lista = [];
+  let pos = 0;                 // qual caminho da lista esta sendo tentado
+  let timerRetry = null;
+  let timerRobo = null;
+  let ultimoSinalRobo = 0;
+  let tentativas = {};         // url -> texto do resultado
+
+  function setStatus(texto, tipo) {
+    $('mqttStatus').textContent = 'mqtt: ' + texto;
+    $('mqttDot').className = 'dot ' + tipo;
+  }
+
+  function mostrarTentativas() {
+    const el = $('tentLista');
+    el.textContent = '';
+    if (!lista.length) { el.textContent = '—'; return; }
+    lista.forEach((b) => {
+      const d = document.createElement('div');
+      const r = tentativas[b.url];
+      d.className = r && r.startsWith('OK') ? 'tent-ok' : (r ? 'tent-erro' : '');
+      d.textContent = b.url + ' → ' + (r || 'ainda nao tentado');
+      el.appendChild(d);
+    });
+  }
+
+  function mostrarRobo(texto, classe) {
+    const el = $('roboLinha');
+    el.textContent = texto;
+    el.className = 'robo-linha ' + (classe || '');
+  }
+
+  function sinalRobo(ip) {
+    ultimoSinalRobo = Date.now();
+    mostrarRobo('robô detectado neste broker' + (ip ? ' · ' + ip : ''), 'ok');
+  }
+
+  function iniciarConexao(manterPosicao) {
+    clearTimeout(timerRetry);
+    if (cli) { try { cli.disconnect(); } catch (e) {} cli = null; }
+    lista = listaBrokers(location.protocol, location.hostname, location.search, modoEscolhido());
+    $('brokerSel').value = modoEscolhido();
+    if (!manterPosicao || pos >= lista.length) pos = 0;
+    if (!lista.length) {
+      setStatus('nenhum caminho possível (página https só usa o HiveMQ)', 'off');
+      mostrarTentativas();
+      return;
+    }
+    if (typeof Paho === 'undefined') {
+      setStatus('js/paho-mqtt.js não carregou', 'off');
+      return;
+    }
+    tentar();
+  }
+
+  function tentar() {
+    const b = lista[pos];
+    setStatus('conectando · ' + b.rotulo, 'wait');
+    mostrarTentativas();
+
+    let c;
+    try {
+      c = new Paho.MQTT.Client(b.host, b.porta, '/mqtt', 'gestos_' + Math.random().toString(16).slice(2, 10));
     } catch (e) {
-      console.warn("Erro ao desconectar antes de reconectar:", e);
+      tentativas[b.url] = 'erro: ' + e.message;
+      return proximo();
+    }
+    cli = c;
+
+    c.onConnectionLost = (r) => {
+      if (cli !== c) return;
+      setStatus('caiu · ' + b.rotulo + ' (reconectando)', 'off');
+      mostrarRobo('robô: sem conexão', 'aviso');
+      timerRetry = setTimeout(tentar, 1000);            // tenta o mesmo caminho primeiro
+    };
+    c.onMessageArrived = tratarMensagem;
+
+    c.connect({
+      useSSL: b.ssl, timeout: 5, keepAliveInterval: 30, cleanSession: true,
+      onSuccess: () => {
+        if (cli !== c) return;
+        tentativas[b.url] = 'OK';
+        setStatus('online · ' + b.rotulo, 'on');
+        mostrarTentativas();
+        c.subscribe(TOPICO_MODO);
+        c.subscribe(TOPICO_ROBO_IP);
+        publicarMotores(0, 0, 'S', true);                // comeca parado
+        ultimoSinalRobo = 0;
+        mostrarRobo('robô: procurando neste broker...', '');
+        clearTimeout(timerRobo);
+        timerRobo = setTimeout(() => {
+          if (!ultimoSinalRobo && cli === c && c.isConnected()) {
+            mostrarRobo('nenhum sinal do robô neste broker. O ESP32 pode estar em outro (veja "broker" na página /debug dele).', 'aviso');
+          }
+        }, AVISO_ROBO_MS);
+      },
+      onFailure: (e) => {
+        if (cli !== c) return;
+        tentativas[b.url] = 'falhou: ' + (e.errorMessage || e.errorCode);
+        mostrarTentativas();
+        proximo();
+      }
+    });
+  }
+
+  // Falhou: tenta o proximo caminho da lista. Deu a volta inteira: espera 2 s.
+  function proximo() {
+    pos = (pos + 1) % lista.length;
+    timerRetry = setTimeout(tentar, pos === 0 ? 2000 : 300);
+  }
+
+  function conectado() { return !!(cli && cli.isConnected()); }
+
+  function tratarMensagem(msg) {
+    let d;
+    try { d = JSON.parse(msg.payloadString); } catch (e) { return; }
+    if (msg.destinationName === TOPICO_MODO) {
+      sinalRobo();
+      if (d.modo) atualizarPainelPedido(d.modo, d.mesa);
+    } else if (msg.destinationName === TOPICO_ROBO_IP) {
+      sinalRobo(d.ip);
     }
   }
-  conectar();
-}
 
-document.getElementById("stopBtn").addEventListener("click", () => publicarMotores(0, 0, "S", true));
-document.getElementById("reconectarBtn").addEventListener("click", reconectarMqtt);
+  // ================================================================
+  // ENVIO DE COMANDOS
+  // ================================================================
+  function publicarMotores(esq, dir, direcao, forcar) {
+    // Enquanto o robo esta em "aguardando" nenhum comando manual sai daqui.
+    if (modoRobo === 'aguardando') { esq = 0; dir = 0; direcao = 'S'; }
 
-document.getElementById("baseBtn").addEventListener("click", () => {
-  publicarMotores(0, 0, "S", true); // para o robo por seguranca
-  if (client && client.isConnected()) {
-    const mensagem = new Paho.MQTT.Message(JSON.stringify({ status: "chegou" }));
-    mensagem.destinationName = "gestos/robo/comando/base";
-    client.send(mensagem);
+    const payload = JSON.stringify({ dir: direcao, motor_esq: Math.round(esq), motor_dir: Math.round(dir) });
+    atualizarBarras(esq, dir);
+
+    const agora = performance.now();
+    if (!forcar) {
+      if (payload === ultimoPayload && agora - ultimoEnvio < 500) return;   // igual: so repete a cada 500 ms
+      if (agora - ultimoEnvio < COOLDOWN_MS) return;
+    }
+
+    if (conectado()) {
+      try {
+        const m = new Paho.MQTT.Message(payload);
+        m.destinationName = TOPICO_MOTORES;
+        cli.send(m);
+        enviados++;
+      } catch (e) { /* conexao caiu agora; o proximo envio tenta de novo */ }
+    }
+    $('cmdLine').textContent = payload + (conectado() ? '  · enviados: ' + enviados : '  · SEM CONEXAO (nao enviado)');
+    ultimoEnvio = agora;
+    ultimoPayload = payload;
   }
-  baseBtn.style.display = "none";
-});
 
-function publicarMotores(motorEsq, motorDir, direcao, forcar = false) {
-  // Trava de seguranca: enquanto o robo estiver em "aguardando" (cor da
-  // mesa detectada, esperando confirmacao), nenhum comando manual sai daqui
-  // — nem gesto, nem D-pad, nem teclado. So volta a valer em navegando/retornando.
-  if (modoRobo === "aguardando") {
-    motorEsq = 0;
-    motorDir = 0;
-    direcao = "S";
+  function atualizarBarras(esq, dir) {
+    $('valEsq').textContent = Math.round(esq);
+    $('valDir').textContent = Math.round(dir);
+    [[esq, $('fillEsq')], [dir, $('fillDir')]].forEach(([v, el]) => {
+      const pct = Math.min(Math.abs(v) / VELOCIDADE_MAX, 1) * 50;
+      el.classList.toggle('neg', v < 0);
+      el.style.left = (v >= 0 ? 50 : 50 - pct) + '%';
+      el.style.width = pct + '%';
+    });
   }
 
-  const payload = JSON.stringify({
-    dir: direcao,
-    motor_esq: Math.round(motorEsq),
-    motor_dir: Math.round(motorDir)
+  function pararTudo() { publicarMotores(0, 0, 'S', true); }
+
+  // ================================================================
+  // PAINEL DO PEDIDO (estado vindo do robo)
+  // ================================================================
+  function atualizarPainelPedido(modo, mesa) {
+    modoRobo = modo;
+    if (mesa !== undefined && mesa !== null) mesaAtual = mesa;
+    if (modo === 'dormindo') mesaAtual = null;
+
+    $('pedidoBox').className = 'pedido-box ' + modo;
+    $('layout').classList.toggle('bloqueado', modo === 'aguardando');
+    $('baseBtn').style.display = modo === 'retornando' ? 'block' : 'none';
+    if (modo === 'aguardando') pararTudo();
+
+    const mesaTxt = mesaAtual ? 'Mesa ' + mesaAtual : '';
+    const textos = {
+      navegando:  [mesaTxt ? 'Levar para ' + mesaTxt : 'Em rota para a mesa', 'Controle liberado — dirija até a mesa indicada'],
+      obstaculo:  ['Obstáculo à frente', 'O robô não avança para frente até o caminho liberar'],
+      aguardando: [mesaTxt ? mesaTxt + ' — aguardando confirmação' : 'Aguardando confirmação', 'Cor da mesa detectada — controle bloqueado'],
+      retornando: ['Pedido concluído', 'Controle liberado — retorne à base'],
+      erro:       ['Emergência / erro no robô', 'Motores travados. Libere pela página /debug do robô'],
+    };
+    const t = textos[modo] || ['Nenhum pedido ativo', 'Aguardando despacho da cozinha'];
+    $('pedidoLabel').textContent = t[0];
+    $('pedidoSub').textContent = t[1];
+  }
+
+  // ================================================================
+  // CONTROLES: velocidade, turbo, setas, teclado
+  // ================================================================
+  // Mistura "frente" e "curva" em dois motores (direcao tipo tanque).
+  function motoresPorVetor(nx, ny, escala) {
+    const frente = -ny, curva = nx;
+    let esq = frente + curva, dir = frente - curva;
+    const maior = Math.max(Math.abs(esq), Math.abs(dir), 1);
+    esq = (esq / maior) * escala;
+    dir = (dir / maior) * escala;
+
+    let direcao = 'S';
+    if (Math.abs(frente) < 0.08 && Math.abs(curva) < 0.08) direcao = 'S';
+    else if (Math.abs(curva) > Math.abs(frente)) direcao = curva > 0 ? 'R' : 'L';
+    else direcao = frente > 0 ? 'F' : 'B';
+    return { esq, dir, direcao };
+  }
+
+  function enviarDirecao(nx, ny) {
+    const escala = (turbo ? 1 : velocidadePct) * VELOCIDADE_MAX;
+    const r = motoresPorVetor(nx, ny, escala);
+    publicarMotores(r.esq, r.dir, r.direcao, true);
+  }
+
+  $('turboBtn').addEventListener('click', () => {
+    turbo = !turbo;
+    $('turboBtn').textContent = 'Turbo: ' + (turbo ? 'ligado' : 'desligado');
+    $('turboBtn').classList.toggle('ativo', turbo);
+  });
+  $('velocidadeSlider').addEventListener('input', (ev) => {
+    velocidadePct = Number(ev.target.value) / 100;
+    $('velocidadeVal').textContent = ev.target.value + '%';
+  });
+  $('stopBtn').addEventListener('click', pararTudo);
+
+  // ---- D-pad (toque / mouse) ----
+  let timerDpad = null;
+  document.querySelectorAll('.dpad-btn').forEach((btn) => {
+    const dx = Number(btn.dataset.dx), dy = Number(btn.dataset.dy);
+    const norma = Math.hypot(dx, dy) || 1;            // diagonal nao fica mais forte que reta
+    const nx = dx / norma, ny = dy / norma;
+    let idAtivo = null;
+
+    btn.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      idAtivo = ev.pointerId;
+      try { btn.setPointerCapture(ev.pointerId); } catch (e) {}   // mouse: continua valendo se sair do botao
+      btn.classList.add('pressionado');
+      enviarDirecao(nx, ny);
+      clearInterval(timerDpad);
+      timerDpad = setInterval(() => enviarDirecao(nx, ny), REPETICAO_MS);
+    });
+    const soltar = (ev) => {
+      if (ev && ev.pointerId !== idAtivo) return;
+      idAtivo = null;
+      btn.classList.remove('pressionado');
+      clearInterval(timerDpad);
+      timerDpad = null;
+      pararTudo();
+    };
+    btn.addEventListener('pointerup', soltar);
+    btn.addEventListener('pointercancel', soltar);
   });
 
-  atualizarBarras(motorEsq, motorDir);
-  cmdLine.textContent = payload;
-
-  const agora = performance.now();
-  if (!forcar) {
-    if (payload === ultimoPayload && (agora - ultimoEnvio) < 500) return;
-    if ((agora - ultimoEnvio) < COOLDOWN_MS) return;
+  // ---- Teclado (setas ou WASD; vale nas duas abas) ----
+  const teclas = new Set();
+  let timerTeclado = null;
+  const MAPA = {
+    ArrowUp: [0, -1], w: [0, -1], W: [0, -1], ArrowDown: [0, 1], s: [0, 1], S: [0, 1],
+    ArrowLeft: [-1, 0], a: [-1, 0], A: [-1, 0], ArrowRight: [1, 0], d: [1, 0], D: [1, 0],
+  };
+  function enviarTeclado() {
+    let dx = 0, dy = 0;
+    teclas.forEach((t) => { dx += MAPA[t][0]; dy += MAPA[t][1]; });
+    if (dx === 0 && dy === 0) return pararTudo();
+    const n = Math.hypot(dx, dy);
+    enviarDirecao(dx / n, dy / n);
   }
-
-  if (client && client.isConnected()) {
-    const mensagem = new Paho.MQTT.Message(payload);
-    mensagem.destinationName = MQTT_TOPIC;
-    client.send(mensagem);
+  function pararTeclado() {
+    teclas.clear();
+    clearInterval(timerTeclado);
+    timerTeclado = null;
+    pararTudo();
   }
-  ultimoEnvio = agora;
-  ultimoPayload = payload;
-}
-
-function atualizarBarras(esq, dir) {
-  valEsq.textContent = Math.round(esq);
-  valDir.textContent = Math.round(dir);
-  [[esq, fillEsq], [dir, fillDir]].forEach(([v, el]) => {
-    const pct = Math.min(Math.abs(v) / VELOCIDADE_MAX, 1) * 50;
-    el.classList.toggle("neg", v < 0);
-    if (v >= 0) { el.style.left = "50%"; el.style.width = pct + "%"; }
-    else { el.style.left = (50 - pct) + "%"; el.style.width = pct + "%"; }
-  });
-}
-
-// ------------------------------------------------------------------
-// Mixagem diferencial (tank steering) a partir de um vetor normalizado
-// (-1..1, -1..1). Usada tanto pelo D-pad (vetores fixos de 8 direcoes)
-// quanto poderia ser usada por um joystick continuo no futuro.
-// ------------------------------------------------------------------
-function motoresPorVetor(nx, ny, escalaVelocidade) {
-  const frente = -ny;
-  const curva = nx;
-
-  let esq = frente + curva;
-  let dir = frente - curva;
-
-  const maior = Math.max(Math.abs(esq), Math.abs(dir), 1);
-  esq /= maior;
-  dir /= maior;
-
-  esq *= escalaVelocidade;
-  dir *= escalaVelocidade;
-
-  let direcao = "S";
-  if (Math.abs(frente) < 0.08 && Math.abs(curva) < 0.08) direcao = "S";
-  else if (Math.abs(curva) > Math.abs(frente)) direcao = curva > 0 ? "R" : "L";
-  else direcao = frente > 0 ? "F" : "B";
-
-  return { esq, dir, direcao };
-}
-
-// ╔═════════════════════════════════════════════════════════════╗
-// ║  ABA "SETAS" (D-pad touch + teclado)                          ║
-// ╚═════════════════════════════════════════════════════════════╗
-turboBtn.addEventListener("click", () => {
-  turboAtivo = !turboAtivo;
-  turboBtn.textContent = "Turbo: " + (turboAtivo ? "ligado" : "desligado");
-  turboBtn.classList.toggle("ativo", turboAtivo);
-});
-
-// ---------------- Barra de velocidade ----------------
-// O turbo ignora essa barra e sempre manda o maximo (100%).
-const velocidadeSlider = document.getElementById("velocidadeSlider");
-const velocidadeVal = document.getElementById("velocidadeVal");
-velocidadeSlider.addEventListener("input", () => {
-  velocidadeNormalPct = Number(velocidadeSlider.value) / 100;
-  velocidadeVal.textContent = velocidadeSlider.value + "%";
-});
-
-let intervaloDpad = null;
-let controleManualAtivo = false; // true enquanto D-pad ou teclado estao sendo usados
-
-// Funcao unica que os dois controles (D-pad touch e teclado) chamam,
-// pra nao duplicar a logica de escala/turbo/publicacao.
-// Agora vale nas duas abas (Gestos e Setas).
-function enviarDirecao(nx, ny) {
-  const escala = (turboAtivo ? 1 : velocidadeNormalPct) * VELOCIDADE_MAX;
-  const { esq, dir, direcao } = motoresPorVetor(nx, ny, escala);
-  publicarMotores(esq, dir, direcao, true);
-}
-
-// ---------------- D-pad touch ----------------
-document.querySelectorAll(".dpad-btn").forEach((btn) => {
-  const dx = Number(btn.dataset.dx);
-  const dy = Number(btn.dataset.dy);
-  // normaliza diagonais pra nao ficarem mais "fortes" que as retas
-  const norma = Math.hypot(dx, dy) || 1;
-  const nx = dx / norma;
-  const ny = dy / norma;
-
-  function enviar() { enviarDirecao(nx, ny); }
-
-  let pointerAtivoId = null;
-
-  function pressionar(ev) {
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key === ' ') { ev.preventDefault(); return pararTeclado(); }
+    if (!MAPA[ev.key]) return;
     ev.preventDefault();
-    pointerAtivoId = ev.pointerId;
-    controleManualAtivo = true;
-    btn.classList.add("pressionado");
-    enviar();
-    clearInterval(intervaloDpad);
-    intervaloDpad = setInterval(enviar, REPETICAO_DPAD_MS);
-  }
-
-  function soltar(ev) {
-    // so solta se for o mesmo toque que apertou (evita solturas fantasmas)
-    if (ev && ev.pointerId !== pointerAtivoId) return;
-    pointerAtivoId = null;
-    controleManualAtivo = false;
-    btn.classList.remove("pressionado");
-    clearInterval(intervaloDpad);
-    intervaloDpad = null;
-    publicarMotores(0, 0, "S", true);
-  }
-
-  // pointerleave foi removido de proposito: no touch, o dedo sair 1px da
-  // area do botao (sem ser intencional) disparava esse evento e parava o
-  // motor no meio do comando. Agora so solta ao levantar o dedo de verdade
-  // (pointerup) ou se o toque for cancelado pelo sistema (pointercancel).
-  btn.addEventListener("pointerdown", pressionar);
-  btn.addEventListener("pointerup", soltar);
-  btn.addEventListener("pointercancel", soltar);
-});
-
-document.getElementById("dpadCenterStop") && document.getElementById("dpadCenterStop")
-  .addEventListener("click", () => publicarMotores(0, 0, "S", true));
-
-// ---------------- Teclado (setas ou WASD) ----------------
-// Guarda quais teclas de direcao estao pressionadas ao mesmo tempo,
-// pra permitir diagonais (ex: cima + direita = nordeste).
-// Funciona nas duas abas (Gestos e Setas).
-const teclasAtivas = new Set();
-let intervaloTeclado = null;
-
-const MAPA_TECLAS = {
-  ArrowUp: [0, -1], w: [0, -1], W: [0, -1],
-  ArrowDown: [0, 1], s: [0, 1], S: [0, 1],
-  ArrowLeft: [-1, 0], a: [-1, 0], A: [-1, 0],
-  ArrowRight: [1, 0], d: [1, 0], D: [1, 0],
-};
-
-function calcularVetorTeclado() {
-  let dx = 0, dy = 0;
-  teclasAtivas.forEach((tecla) => {
-    const par = MAPA_TECLAS[tecla];
-    if (par) { dx += par[0]; dy += par[1]; }
-  });
-  const norma = Math.hypot(dx, dy) || 1;
-  return { nx: dx / norma, ny: dy / norma, parado: dx === 0 && dy === 0 };
-}
-
-function enviarTeclado() {
-  const { nx, ny, parado } = calcularVetorTeclado();
-  if (parado) {
-    publicarMotores(0, 0, "S", true);
-    return;
-  }
-  enviarDirecao(nx, ny);
-}
-
-window.addEventListener("keydown", (ev) => {
-  if (ev.key === " ") { // Espaço = parar tudo
-    ev.preventDefault();
-    teclasAtivas.clear();
-    controleManualAtivo = false;
-    publicarMotores(0, 0, "S", true);
-    return;
-  }
-
-  if (!MAPA_TECLAS[ev.key]) return;
-  ev.preventDefault();
-
-  if (!teclasAtivas.has(ev.key)) {
-    teclasAtivas.add(ev.key);
-    controleManualAtivo = true;
+    if (teclas.has(ev.key)) return;
+    teclas.add(ev.key);
     enviarTeclado();
-    clearInterval(intervaloTeclado);
-    intervaloTeclado = setInterval(enviarTeclado, REPETICAO_DPAD_MS);
-  }
-});
-
-window.addEventListener("keyup", (ev) => {
-  if (!MAPA_TECLAS[ev.key]) return;
-  teclasAtivas.delete(ev.key);
-
-  if (teclasAtivas.size === 0) {
-    controleManualAtivo = false;
-    clearInterval(intervaloTeclado);
-    intervaloTeclado = null;
-    publicarMotores(0, 0, "S", true);
-  } else {
-    enviarTeclado(); // recalcula com as teclas que ainda estao seguradas
-  }
-});
-
-// Se a janela perder o foco com teclas seguradas, o keyup nao dispara —
-// entao paramos tudo por seguranca.
-window.addEventListener("blur", () => {
-  if (teclasAtivas.size > 0) {
-    teclasAtivas.clear();
-    controleManualAtivo = false;
-    clearInterval(intervaloTeclado);
-    intervaloTeclado = null;
-    publicarMotores(0, 0, "S", true);
-  }
-});
-
-// ╔═════════════════════════════════════════════════════════════╗
-// ║  ABA "GESTOS" (MediaPipe)                                    ║
-// ╚═════════════════════════════════════════════════════════════╗
-let gestosIniciados = false;
-let gestureRecognizer;
-let lastVideoTime = -1;
-
-function distancia(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function dedosLevantados(landmarks) {
-  const pulso = landmarks[0];
-  const tamanhoPalma = distancia(pulso, landmarks[9]);
-
-  const polegar = distancia(landmarks[4], landmarks[5]) > tamanhoPalma * 0.65 ? 1 : 0;
-
-  const definicoes = [
-    { ponta: 8, pip: 6 },
-    { ponta: 12, pip: 10 },
-    { ponta: 16, pip: 14 },
-    { ponta: 20, pip: 18 },
-  ];
-
-  const outros = definicoes.map(({ ponta, pip }) => {
-    const distPonta = distancia(landmarks[ponta], pulso);
-    const distPip = distancia(landmarks[pip], pulso);
-    return distPonta > distPip * 1.15 ? 1 : 0;
+    clearInterval(timerTeclado);
+    timerTeclado = setInterval(enviarTeclado, REPETICAO_MS);
+  });
+  window.addEventListener('keyup', (ev) => {
+    if (!MAPA[ev.key]) return;
+    teclas.delete(ev.key);
+    if (teclas.size === 0) pararTeclado(); else enviarTeclado();
   });
 
-  return [polegar, ...outros];
-}
+  // Perdeu o foco / foi para segundo plano: para tudo (o keyup/pointerup pode nao chegar).
+  window.addEventListener('blur', () => { if (teclas.size) pararTeclado(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { clearInterval(timerDpad); pararTudo(); } });
+  window.addEventListener('pagehide', pararTudo);
 
-function anguloDoApontar(landmarks) {
-  const base = landmarks[5];
-  const ponta = landmarks[8];
-  const dx = -(ponta.x - base.x);
-  const dy = ponta.y - base.y;
-  const anguloRad = Math.atan2(dx, -dy);
-  return anguloRad * (180 / Math.PI);
-}
-
-function gestoParaMotores(dedos, landmarks) {
-  const [polegar, indicador, medio, anelar, minimo] = dedos;
-  const total = polegar + indicador + medio + anelar + minimo;
-
-  // Turbo (joinha) ignora a barra de velocidade e vai sempre no maximo,
-  // igual ja acontece no D-pad/teclado.
-  if (polegar && !indicador && !medio && !anelar && !minimo) {
-    return { esq: VELOCIDADE_MAX, dir: VELOCIDADE_MAX, direcao: "A", nome: "👍 Joinha → TURBO" };
-  }
-
-  // Todo o resto usa a barra de velocidade como fator de escala.
-  const escala = velocidadeNormalPct;
-
-  if (total === 5) {
-    return { esq: 0, dir: 0, direcao: "S", nome: "🖐 Mao aberta → PARAR" };
-  }
-  if (total === 0) {
-    return { esq: -VELOCIDADE_MAX * escala, dir: -VELOCIDADE_MAX * escala, direcao: "B", nome: "✊ Punho fechado → RE" };
-  }
-  if (indicador && !polegar && !medio && !anelar && !minimo) {
-    const angulo = anguloDoApontar(landmarks);
-    const abs = Math.abs(angulo);
-    const anguloTxt = `${angulo.toFixed(0)}°`;
-
-    // Ate ANGULO_FRENTE_MAX graus conta como "reto", sem misturar nada de
-    // curva — evita que o tremor natural da mao andando reto vire curva.
-    if (abs < ANGULO_FRENTE_MAX) {
-      return { esq: VELOCIDADE_MAX * 0.8 * escala, dir: VELOCIDADE_MAX * 0.8 * escala, direcao: "F", nome: `☝ Frente (${anguloTxt})` };
+  // ---- Botao "robo na base" ----
+  $('baseBtn').addEventListener('click', () => {
+    pararTudo();
+    if (conectado()) {
+      const m = new Paho.MQTT.Message(JSON.stringify({ status: 'chegou' }));
+      m.destinationName = TOPICO_BASE;
+      cli.send(m);
     }
-    if (abs > 172) {
-      return { esq: 0, dir: 0, direcao: "S", nome: `☝ Angulo instavel (${anguloTxt})` };
-    }
-
-    // Mixagem continua a partir do fim da zona de reto: ANGULO_FRENTE_MAX°
-    // = comeco da curva (bem suave), 90° = giro maximo no lugar.
-    const anguloClamp = Math.max(-90, Math.min(90, angulo));
-    const progresso = (Math.abs(anguloClamp) - ANGULO_FRENTE_MAX) / (90 - ANGULO_FRENTE_MAX);
-    const intensidadeCurva = Math.pow(progresso, 1.5);
-    const sentido = anguloClamp < 0 ? -1 : 1;
-
-    const velBase = VELOCIDADE_MAX * 0.8;
-    const curva = sentido * intensidadeCurva * VELOCIDADE_MAX;
-    const frenteComponente = velBase * (1 - intensidadeCurva);
-
-    let esq = frenteComponente + curva;
-    let dir = frenteComponente - curva;
-
-    const maior = Math.max(Math.abs(esq), Math.abs(dir), VELOCIDADE_MAX);
-    esq = (esq / maior) * VELOCIDADE_MAX * escala;
-    dir = (dir / maior) * VELOCIDADE_MAX * escala;
-
-    const direcao = intensidadeCurva < 0.15 ? "F" : (sentido < 0 ? "L" : "R");
-    return { esq, dir, direcao, nome: `☝ Curva suave (${anguloTxt})` };
-  }
-
-  return { esq: 0, dir: 0, direcao: "S", nome: "Gesto nao mapeado" };
-}
-
-async function iniciarReconhecedor() {
-  const vision = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
-  );
-  gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
-    baseOptions: {
-      modelAssetPath:
-        "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
-      delegate: "GPU"
-    },
-    runningMode: "VIDEO",
-    numHands: 1
+    $('baseBtn').style.display = 'none';
   });
-}
 
-async function iniciarCamera() {
-  const video = document.getElementById("webcam");
-  const canvas = document.getElementById("overlay");
+  // ---- Broker e reconexao ----
+  $('brokerSel').addEventListener('change', (ev) => {
+    try { localStorage.setItem(CHAVE_BROKER, ev.target.value); } catch (e) {}
+    tentativas = {};
+    iniciarConexao(false);
+  });
+  $('reconectarBtn').addEventListener('click', () => { tentativas = {}; iniciarConexao(false); });
 
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const cameras = devices.filter((d) => d.kind === "videoinput");
-    if (cameras.length === 0) {
-      gestureTag.textContent = "ERRO: nenhuma camera encontrada pelo navegador";
-      throw new Error("Nenhum videoinput encontrado");
-    }
-  } catch (e) {
-    console.warn("Nao foi possivel listar dispositivos:", e);
+  // ---- Abas ----
+  function mudarAba(nome) {
+    aba = nome;
+    $('abaGestos').classList.toggle('ativa', nome === 'gestos');
+    $('abaSetas').classList.toggle('ativa', nome === 'setas');
+    $('tabBtnGestos').classList.toggle('ativo', nome === 'gestos');
+    $('tabBtnSetas').classList.toggle('ativo', nome === 'setas');
+    pararTudo();
+  }
+  $('tabBtnGestos').addEventListener('click', () => mudarAba('gestos'));
+  $('tabBtnSetas').addEventListener('click', () => mudarAba('setas'));
+
+  // ================================================================
+  // GESTOS (MediaPipe) — carregado a parte: se o CDN falhar, so a camera
+  // para de funcionar; MQTT e setas continuam normais.
+  // ================================================================
+  const MEDIAPIPE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+  const MODELO_URL = 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task';
+
+  let reconhecedor = null, mp = null, ultimoTempoVideo = -1;
+
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+  // [polegar, indicador, medio, anelar, minimo] = 1 se levantado
+  function dedosLevantados(lm) {
+    const pulso = lm[0];
+    const palma = dist(pulso, lm[9]);
+    const polegar = dist(lm[4], lm[5]) > palma * 0.65 ? 1 : 0;
+    const outros = [[8, 6], [12, 10], [16, 14], [20, 18]].map(([ponta, pip]) =>
+      dist(lm[ponta], pulso) > dist(lm[pip], pulso) * 1.15 ? 1 : 0);
+    return [polegar, ...outros];
   }
 
-  try {
-    let stream;
+  // Angulo do indicador em graus: 0 = reto pra cima, negativo = esquerda, positivo = direita
+  function anguloDoApontar(lm) {
+    const dx = -(lm[8].x - lm[5].x);
+    const dy = lm[8].y - lm[5].y;
+    return Math.atan2(dx, -dy) * (180 / Math.PI);
+  }
+
+  function gestoParaMotores(dedos, lm) {
+    const [polegar, indicador, medio, anelar, minimo] = dedos;
+    const total = dedos.reduce((a, b) => a + b, 0);
+    const escala = velocidadePct;
+
+    if (polegar && !indicador && !medio && !anelar && !minimo)
+      return { esq: VELOCIDADE_MAX, dir: VELOCIDADE_MAX, direcao: 'A', nome: '👍 Joinha → TURBO' };
+    if (total === 5)
+      return { esq: 0, dir: 0, direcao: 'S', nome: '🖐 Mão aberta → PARAR' };
+    if (total === 0)
+      return { esq: -VELOCIDADE_MAX * escala, dir: -VELOCIDADE_MAX * escala, direcao: 'B', nome: '✊ Punho → RÉ' };
+
+    if (indicador && !polegar && !medio && !anelar && !minimo) {
+      const angulo = anguloDoApontar(lm);
+      const abs = Math.abs(angulo);
+      const txt = angulo.toFixed(0) + '°';
+
+      if (abs < ANGULO_FRENTE_MAX) {                       // "reto": ignora o tremor da mao
+        const v = VELOCIDADE_MAX * 0.8 * escala;
+        return { esq: v, dir: v, direcao: 'F', nome: '☝ Frente (' + txt + ')' };
+      }
+      if (abs > 172) return { esq: 0, dir: 0, direcao: 'S', nome: '☝ Ângulo instável (' + txt + ')' };
+
+      // 25° = comeco da curva suave, 90° = giro maximo no lugar
+      const clamp = Math.max(-90, Math.min(90, angulo));
+      const prog = (Math.abs(clamp) - ANGULO_FRENTE_MAX) / (90 - ANGULO_FRENTE_MAX);
+      const intens = Math.pow(prog, 1.5);
+      const sentido = clamp < 0 ? -1 : 1;
+      const frente = VELOCIDADE_MAX * 0.8 * (1 - intens);
+      const curva = sentido * intens * VELOCIDADE_MAX;
+      let esq = frente + curva, dir = frente - curva;
+      const maior = Math.max(Math.abs(esq), Math.abs(dir), VELOCIDADE_MAX);
+      esq = (esq / maior) * VELOCIDADE_MAX * escala;
+      dir = (dir / maior) * VELOCIDADE_MAX * escala;
+      const direcao = intens < 0.15 ? 'F' : (sentido < 0 ? 'L' : 'R');
+      return { esq, dir, direcao, nome: '☝ Curva (' + txt + ')' };
+    }
+    return { esq: 0, dir: 0, direcao: 'S', nome: 'Gesto não mapeado' };
+  }
+
+  function tag(texto, erro) {
+    $('gestureTag').textContent = texto;
+    $('gestureTag').classList.toggle('erro', !!erro);
+  }
+
+  async function iniciarGestos() {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 } }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
+        throw new Error('câmera só funciona em página https (ou localhost) — use a aba Setas');
+
+      tag('carregando modelo de gestos...');
+      mp = await import(MEDIAPIPE_URL);                     // import dinamico: falha aqui nao derruba a pagina
+      const vision = await mp.FilesetResolver.forVisionTasks(MEDIAPIPE_URL + '/wasm');
+      reconhecedor = await mp.GestureRecognizer.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: MODELO_URL, delegate: 'GPU' },
+        runningMode: 'VIDEO', numHands: 1,
       });
-    } catch (primeiroErro) {
-      console.warn("Falhou com constraints especificas, tentando video:true simples...", primeiroErro);
-      stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    }
-    video.srcObject = stream;
-    await new Promise((resolve) => (video.onloadedmetadata = resolve));
-    video.play();
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-  } catch (err) {
-    console.error("Erro ao acessar a camera:", err);
-    gestureTag.textContent = `ERRO (${err.name}): ${err.message}`;
-    gestureTag.style.color = "#ff6b5e";
-    gestureTag.style.borderColor = "#ff6b5e";
-    throw err;
-  }
-}
 
-function loopGestos() {
-  const video = document.getElementById("webcam");
-  const canvas = document.getElementById("overlay");
-  const ctx = canvas.getContext("2d");
-
-  if (video.currentTime !== lastVideoTime) {
-    lastVideoTime = video.currentTime;
-    const nowMs = performance.now();
-    const resultado = gestureRecognizer.recognizeForVideo(video, nowMs);
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (resultado.landmarks.length > 0) {
-      const landmarks = resultado.landmarks[0];
-
-      const drawer = new DrawingUtils(ctx);
-      drawer.drawLandmarks(landmarks, { color: "#35d0ba", radius: 3 });
-      drawer.drawConnectors(landmarks, GestureRecognizer.HAND_CONNECTIONS, { color: "#1c6e63", lineWidth: 2 });
-
-      const dedos = dedosLevantados(landmarks);
-      const { esq, dir, direcao, nome } = gestoParaMotores(dedos, landmarks);
-      gestureTag.textContent = nome;
-      if (abaAtiva === "gestos") publicarMotores(esq, dir, direcao);
-    } else {
-      gestureTag.textContent = "nenhuma mao detectada";
-      if (abaAtiva === "gestos") publicarMotores(0, 0, "S");
+      tag('pedindo acesso à câmera...');
+      const video = $('webcam'), canvas = $('overlay');
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 } } });
+      } catch (e) {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+      video.srcObject = stream;
+      await new Promise((ok) => (video.onloadedmetadata = ok));
+      await video.play();
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      laco();
+    } catch (e) {
+      console.error('Gestos:', e);
+      tag('ERRO nos gestos: ' + (e.message || e.name) + ' (setas e MQTT seguem funcionando)', true);
     }
   }
-  requestAnimationFrame(loopGestos);
-}
 
-async function iniciarGestos() {
-  try {
-    gestureTag.textContent = "carregando modelo de gestos...";
-    await iniciarReconhecedor();
-    gestureTag.textContent = "pedindo acesso a camera...";
-    await iniciarCamera();
-    loopGestos();
-  } catch (e) {
-    console.error("Falha na inicializacao dos gestos:", e);
-    if (!gestureTag.textContent.startsWith("ERRO")) {
-      gestureTag.textContent = "ERRO: " + e.message;
-    }
+  function laco() {
+    const video = $('webcam'), canvas = $('overlay'), ctx = canvas.getContext('2d');
+    const desenho = new mp.DrawingUtils(ctx);
+
+    (function frame() {
+      if (video.currentTime !== ultimoTempoVideo) {
+        ultimoTempoVideo = video.currentTime;
+        const res = reconhecedor.recognizeForVideo(video, performance.now());
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (res.landmarks.length > 0) {
+          const lm = res.landmarks[0];
+          desenho.drawLandmarks(lm, { color: '#35d0ba', radius: 3 });
+          desenho.drawConnectors(lm, mp.GestureRecognizer.HAND_CONNECTIONS, { color: '#1c6e63', lineWidth: 2 });
+          const g = gestoParaMotores(dedosLevantados(lm), lm);
+          tag(g.nome);
+          if (aba === 'gestos') publicarMotores(g.esq, g.dir, g.direcao, false);
+        } else {
+          tag('nenhuma mão detectada');
+          if (aba === 'gestos') publicarMotores(0, 0, 'S', false);
+        }
+      }
+      requestAnimationFrame(frame);
+    })();
   }
-}
 
-// ------------------------------------------------------------------
-// Inicializacao geral: MQTT sempre conecta; gestos so iniciam quando
-// a aba "Gestos" e aberta (que ja e' a aba padrao ao carregar a pagina).
-// ------------------------------------------------------------------
-conectar();
-gestosIniciados = true;
-iniciarGestos();
+  // ================================================================
+  // INICIO: MQTT primeiro (nao depende da camera), depois os gestos
+  // ================================================================
+  iniciarConexao(false);
+  iniciarGestos();
+})();
 </script>
-
 </body>
 </html>
