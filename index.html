@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Controle de Robo — MQTT</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+<script src="js/paho-mqtt.js"></script>
 <style>
   :root{
     --bg: #0d1117;
@@ -276,10 +276,15 @@ import {
 // ------------------------------------------------------------------
 // CONFIG - fixo no codigo, sem campos na tela
 // ------------------------------------------------------------------
-const MQTT_HOST = "10.151.139.5";
-const MQTT_PORT = 9001; // WebSocket do Mosquitto local — a 1883 e' a porta MQTT "crua" (TCP) que so' o ESP32 usa; o navegador (Paho) precisa de WS
+
 const MQTT_TOPIC = "gestos/robo/comando/motores";
 const TOPICO_DISPLAY_MODO = "robo/display/comando/modo";
+
+// Broker fixo: somente HiveMQ publico (sem troca de broker)
+const HIVEMQ = { host: "broker.hivemq.com", port: 8884, path: "/mqtt", useSSL: true, nome: "HiveMQ" };
+function gerarClientId(prefixo) {
+  return prefixo + "_" + Math.random().toString(16).slice(2, 10);
+}
 
 const VELOCIDADE_MAX = 255;
 let velocidadeNormalPct = 0.6; // ajustavel pela barra de velocidade (10%-100%)
@@ -364,8 +369,8 @@ window.mudarAba = function (nome) {
 let client = null;
 
 function conectar() {
-  const clientId = "robo_" + Math.random().toString(16).slice(2);
-  client = new Paho.MQTT.Client(MQTT_HOST, MQTT_PORT, clientId);
+  const clientId = gerarClientId("gestos");
+  client = new Paho.MQTT.Client(HIVEMQ.host, HIVEMQ.port, HIVEMQ.path, clientId);
 
   client.onConnectionLost = (resposta) => {
     mqttDot.className = "dot off";
@@ -387,15 +392,15 @@ function conectar() {
   mqttStatus.textContent = "mqtt: conectando";
 
   client.connect({
-    useSSL: false, // pagina servida via HTTP local (nao HTTPS) -> ws:// sem TLS
+    useSSL: HIVEMQ.useSSL, timeout: 5, keepAliveInterval: 30,
     onSuccess: () => {
       mqttDot.className = "dot on";
-      mqttStatus.textContent = "mqtt: online";
+      mqttStatus.textContent = "mqtt: online · " + HIVEMQ.nome;
       client.subscribe(TOPICO_DISPLAY_MODO);
     },
     onFailure: (err) => {
       mqttDot.className = "dot off";
-      mqttStatus.textContent = "mqtt: falha - " + err.errorMessage;
+      mqttStatus.textContent = "mqtt: falha · " + HIVEMQ.nome + " - " + err.errorMessage;
       setTimeout(conectar, 2000);
     },
   });
